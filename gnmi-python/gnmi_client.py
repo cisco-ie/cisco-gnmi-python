@@ -1,35 +1,35 @@
-#!bin/env
-# Copyright 2018 Cisco Systems All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met:
-#
-#     * Redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer.
-#
-# The contents of this file are licensed under the Apache License, Version 2.0
-# (the "License"); you may not use this file except in compliance with the
-# License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-# License for the specific language governing permissions and limitations under
-# the License.
+"""Copyright 2019 Cisco Systems All rights reserved.
 
-""" Libraries to connect XR gRPC server """
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+ * Redistributions of source code must retain the above copyright
+ notice, this list of conditions and the following disclaimer.
+
+The contents of this file are licensed under the Apache License, Version 2.0
+(the "License"); you may not use this file except in compliance with the
+License. You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations under
+the License.
+"""
+
+"""Python gNMI wrapper to ease usage."""
 
 import grpc
-from . import gnmi_pb2_grpc
-from . import gnmi_pb2
+from .proto import gnmi_pb2_grpc
+from .proto import gnmi_pb2
 from . import json_format
 
 from grpc.beta import implementations
 
-class CiscoGNMIClient(object):
+class GNMIClient(object):
     """This class creates grpc calls using python.
     """
     def __init__(self, host, port, timeout, user, password, creds=None, options=None):
@@ -73,7 +73,7 @@ class CiscoGNMIClient(object):
             self._timeout
         )
 
-    def gnmi_capability(self):
+    def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
         is supported by the target. This allows the target to validate the
         service version that is implemented and retrieve the set of models that
@@ -85,8 +85,8 @@ class CiscoGNMIClient(object):
         responses = self._stub.Capabilities(message, metadata=self._metadata)
         return responses
     
-    def gnmi_get(self, path, prefix=None, gnmi_type=None,
-            encoding=0, user_models=None, extension=extension):
+    def get(self, path, prefix=None, gnmi_type=None,
+            encoding=0, user_models=None, extension=None):
         """
         A snapshot of the state that exists on the target
         :param path: A set of paths to request data snapshot
@@ -109,12 +109,12 @@ class CiscoGNMIClient(object):
             prefix=prefix,
             type=gnmi_type,
             encoding=encoding,
-            use_models=use_models,
+            user_models=user_models,
             extension=extension)
         response = self._stub.Get(request, metadata=self._metadata)
-        return responses
+        return response
     
-    def gnmi_set(self, prefix=None, update=None, replace=None, delete=None, extension=None):
+    def set(self, prefix=None, update=None, replace=None, delete=None, extension=None):
         """
         Modifications to the state of the target are made through the Set RPC.
         A client sends a SetRequest message to the target indicating the modifications
@@ -138,7 +138,7 @@ class CiscoGNMIClient(object):
         response = self._stub.Set(request, metadata=self._metadata)
         return response
     
-    def gnmi_subscribe(self, subs, interval_seconds, encoding=2):
+    def subscribe(self, subs, interval_seconds, encoding=2):
         """
         Subscription to receive updates relating to the state of data instances on a target
         :param subs: Subscription paths to subscribe to
@@ -156,7 +156,7 @@ class CiscoGNMIClient(object):
             for pathlevel in sub.split("/"):
                 pathelems.append(gnmi_pb2.PathElem(name=pathlevel))
             path = gnmi_pb2.Path(elem=pathelems)
-            subscriptions.append(gnmi_pb2.Subscriptions(path=path, sample_interval=interval, mode="SAMPLE"))
+            subscriptions.append(gnmi_pb2.Subscription(path=path, sample_interval=interval, mode="SAMPLE"))
         sublist = gnmi_pb2.SubscriptionList(subscriptions=subscriptions,encoding=encoding)
         subreq = [gnmi_pb2.SubscribeRequest(subscribe=sublist)]
         stream = self._stub.Subscribe(subreq, metadata=self._metadata)
