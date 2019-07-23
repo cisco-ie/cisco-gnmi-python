@@ -29,39 +29,31 @@ from . import json_format
 
 from grpc.beta import implementations
 
-class GNMIClient(object):
+class Client(object):
     """This class creates grpc calls using python.
     """
-    def __init__(self, host, port, timeout, user, password, creds=None, options=None):
-        """:param user: Username for device login
-            :param password: Password for device login
-            :param host: The ip address for the device
-            :param port: The port for the device
-            :param timeout: how long before the rpc call timesout
-            :param creds: Input of the pem file
-            :param options: TLS server name
-            :type password: str
-            :type user: str
-            :type host: str
-            :type port: int
-            :type timeout:int
-            :type creds: str
-            :type options: str
-        """
-        if creds != None:
-            self._target = '%s:%d' % (host, port)
-            self._creds = implementations.ssl_channel_credentials(creds)
-            self._options = options
-            channel = grpc.secure_channel(
-                self._target, self._creds, (('grpc.ssl_target_name_override', self._options,),))
-            self._channel = implementations.Channel(channel)
-        else:
-            self._host = host
-            self._port = port
-            self._channel = implementations.insecure_channel(self._host, self._port)
-        self._stub = gnmi_pb2_grpc.gNMIStub(self._channel)
-        self._timeout = float(timeout)
-        self._metadata = [('username', user), ('password', password)]
+
+    """Defining property due to gRPC timeout being based on a C long type.
+    Should really define this based on architecture.
+    32-bit C long max value. "Infinity".
+    """
+    __C_MAX_LONG = 2147483647
+
+    def __init__(self, target, username, password,
+        timeout=__C_MAX_LONG,
+        credentials=None,
+        credentials_from_file=False,
+        tls_server_override=None
+    ):
+        self.username = username
+        self.password = password
+        self.timeout = int(timeout)
+        self.__target = self.__gen_target(target)
+        self.__credentials = self.__gen_credentials(credentials, credentials_from_file)
+        self.__options = self.__gen_options(tls_server_override)
+        self.__client = self.__gen_client(
+            self.__target, self.__credentials, self.__options
+        )
 
     def __repr__(self):
         return '%s(Host = %s, Port = %s, User = %s, Password = %s, Timeout = %s)' % (
@@ -169,3 +161,89 @@ class GNMIClient(object):
         :type: function
         """
         self._channel.subscribe(callback, True)
+    
+    @staticmethod
+    def __gen_target(target, netloc_prefix="//", default_port=50051):
+        """Parses and validates a supplied target URL for gRPC calls.
+        Uses urllib to parse the netloc property from the URL.
+        netloc property is, effectively, fqdn/hostname:port.
+        This provides some level of URL validation and flexibility.
+        Returns netloc property of target.
+        """
+        if netloc_prefix not in target:
+            target = netloc_prefix + target
+        parsed_target = urlparse(target)
+        if not parsed_target.netloc:
+            raise ValueError("Unable to parse netloc from target URL %s!", target)
+        if parsed_target.scheme:
+            logging.debug("Scheme identified in target, ignoring and using netloc.")
+        target_netloc = parsed_target.netloc
+        if parsed_target.port is None:
+            ported_target = "%s:%i" % (parsed_target.hostname, default_port)
+            logging.debug("No target port detected, reassembled to %s.", ported_target)
+            target_netloc = Client.__gen_target(ported_target)
+        return target_netloc
+
+    @staticmethod
+    def __gen_client(target, credentials=None, options=None):
+        """Instantiates and returns the NX-OS gRPC client stub
+        over an insecure or secure channel.
+        """
+        client = None
+        if not credentials:
+            insecure_channel = grpc.insecure_channel(target)
+            client = proto.gRPCConfigOperStub(insecure_channel)
+        else:
+            channel_creds = grpc.ssl_channel_credentials(credentials)
+            secure_channel = grpc.secure_channel(target, channel_creds, options)
+            client = proto.gRPCConfigOperStub(secure_channel)
+        return client
+
+    @staticmethod
+    def __gen_credentials(credentials, credentials_from_file):
+        """Generate credentials either by reading credentials from
+        the specified file or return the original creds specified.
+        """
+        if not credentials:
+            return None
+        if credentials_from_file:
+            with open(credentials, "rb") as creds_fd:
+                credentials = creds_fd.read()
+        return credentials
+
+    @staticmethod
+    def __gen_options(tls_server_override):
+        """Generate options tuple for gRPC overrides, etc.
+        Only TLS server is handled currently.
+        """
+        options = []
+        if tls_server_override:
+            options.append(("grpc.ssl_target_name_override", tls_server_override))
+        return tuple(options)
+
+    @staticmethod
+    def __parse_xpath_to_json(xpath, namespace):
+        """Parses an XPath to JSON representation, and appends
+        namespace into the JSON request.
+        """
+        if not namespace:
+            raise ValueError("Must include namespace if constructing from xpath!")
+        xpath_dict = {}
+        xpath_split = xpath.split("/")
+        first = True
+        for element in reversed(xpath_split):
+            if first:
+                xpath_dict[element] = {}
+                first = False
+            else:
+                xpath_dict = {element: xpath_dict}
+        xpath_dict["namespace"] = namespace
+        return json.dumps(xpath_dict)
+
+    @staticmethod
+    def __validate_enum_arg(name, valid_options, message=None):
+        """Construct error around enumeration validation."""
+        if name not in valid_options:
+            if not message:
+                message = "%s must be one of %s" % (name, ", ".join(valid_options))
+            raise ValueError(message)
