@@ -6,8 +6,12 @@ name = "pypi"
 [dev-packages]
 grpcio-tools = "*"
 googleapis-common-protos = "*"
+pylint = "*"
+black = "==19.3b0"
 
 [packages]
+grpcio = "*"
+protobuf = "*"
 
 [requires]
 python_version = "3.6"

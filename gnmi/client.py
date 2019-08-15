@@ -90,48 +90,63 @@ class Client(object):
         to restrict the set of data that is utilized.
         Reference: gNMI Specification Section 3.2
         """
-        message = proto.CapabilityRequest()
-        responses = self.__client.Capabilities(message, metadata=self.__gen_metadata())
-        return responses
+        message = proto.gnmi_pb2.CapabilityRequest()
+        response = self.__client.Capabilities(message, metadata=self.__gen_metadata())
+        return response
 
     def get(
         self,
         path,
         prefix=None,
-        gnmi_type=None,
-        encoding=0,
-        user_models=None,
+        data_type=proto.types.GetRequest_DataType.ALL,
+        encoding=proto.types.Encoding.JSON_IETF,
+        use_models=None,
         extension=None,
     ):
         """
         A snapshot of the state that exists on the target
         :param path: A set of paths to request data snapshot
         :param prefix: a path that is applied to all paths
-        :param gnmi_type: type of data requested [CONFIG, STATE, OPERATIONAL]
+        :param data_type: type of data requested [CONFIG, STATE, OPERATIONAL]
         :param encoding: Data format data comes out in 2=Proto, 0=JSON
-        :param user_models: ModelData messages indicating the schema definition
+        :param use_models: ModelData messages indicating the schema definition
         :param extension: a repeated field to carry gNMI extensions
         :type path:
         :type prefix:
         :type gnmi_type: string
         :type encoding: int
-        :type user_models:
+        :type use_models:
         :type extension:
         :return: Return the response object
         :rtype:
         """
-        request = proto.GetRequest(
+        request = proto.gnmi_pb2.GetRequest(
             path=path,
             prefix=prefix,
-            type=gnmi_type,
+            type=data_type,
             encoding=encoding,
-            user_models=user_models,
+            use_models=use_models,
             extension=extension,
         )
         response = self.__client.Get(request, metadata=self.__gen_metadata())
         return response
-    
-    def get_xpath(self, xpath, gnmi_type, encoding)
+
+    def get_xpaths(
+        self,
+        xpaths,
+        data_type=proto.types.GetRequest_DataType.ALL,
+        encoding=proto.types.Encoding.JSON_IETF,
+    ):
+        gnmi_path = None
+        if isinstance(xpaths, (list, set)):
+            gnmi_path = map(self.__parse_xpath_to_gnmi_path, set(xpaths))
+        elif isinstance(xpaths, str):
+            gnmi_path = self.__parse_xpath_to_gnmi_path(xpaths)
+        else:
+            raise Exception(
+                "xpaths must be a single xpath string or iterable of xpath strings!"
+            )
+        return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def set(self, prefix=None, update=None, replace=None, delete=None, extension=None):
         """
@@ -149,7 +164,7 @@ class Client(object):
         :type delete:
         :return: SetResonse with the following fields: prefix, response, extension
         """
-        request = proto.SetRequest(
+        request = proto.gnmi_pb2.SetRequest(
             prefix=prefix, update=update, replace=replace, delete=delete
         )
         response = self.__client.Set(request, metadata=self.__gen_metadata())
@@ -185,11 +200,11 @@ class Client(object):
         client = None
         if not credentials:
             insecure_channel = grpc.insecure_channel(target)
-            client = proto.gNMIStub(insecure_channel)
+            client = proto.gnmi_pb2_grpc.gNMIStub(insecure_channel)
         else:
             channel_creds = grpc.ssl_channel_credentials(credentials)
             secure_channel = grpc.secure_channel(target, channel_creds, options)
-            client = proto.gNMIStub(secure_channel)
+            client = proto.gnmi_pb2_grpc.gNMIStub(secure_channel)
         return client
 
     @staticmethod
@@ -215,23 +230,17 @@ class Client(object):
         return tuple(options)
 
     @staticmethod
-    def __parse_xpath_to_json(xpath, namespace):
-        """Parses an XPath to JSON representation, and appends
-        namespace into the JSON request.
-        """
-        if not namespace:
-            raise ValueError("Must include namespace if constructing from xpath!")
-        xpath_dict = {}
-        xpath_split = xpath.split("/")
-        first = True
-        for element in reversed(xpath_split):
-            if first:
-                xpath_dict[element] = {}
-                first = False
-            else:
-                xpath_dict = {element: xpath_dict}
-        xpath_dict["namespace"] = namespace
-        return json.dumps(xpath_dict)
+    def __parse_xpath_to_gnmi_path(xpath):
+        if not isinstance(xpath, str):
+            raise Exception("xpath must be a string!")
+        path = proto.gnmi_pb2.Path()
+        if xpath.startswith("openconfig") or xpath.startswith("oc"):
+            path.origin = "openconfig"
+        path_elements = []
+        for element in xpath.split("/"):
+            path_elements.append(proto.gnmi_pb2.PathElem(name=element))
+        path.elem = path_elements
+        return path
 
     @staticmethod
     def __validate_enum_arg(name, valid_options, message=None):
