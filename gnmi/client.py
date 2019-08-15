@@ -22,12 +22,19 @@ the License.
 
 """Python gNMI wrapper to ease usage."""
 
-import grpc
-from .proto import gnmi_pb2_grpc
-from .proto import gnmi_pb2
-from . import json_format
+import logging
+import json
 
-from grpc.beta import implementations
+try:
+    # Python 3
+    from urllib.parse import urlparse
+except ImportError:
+    # Python 2
+    from urlparse import urlparse
+
+import grpc
+from . import proto
+
 
 class Client(object):
     """This class creates grpc calls using python.
@@ -39,11 +46,15 @@ class Client(object):
     """
     __C_MAX_LONG = 2147483647
 
-    def __init__(self, target, username, password,
+    def __init__(
+        self,
+        target,
+        username,
+        password,
         timeout=__C_MAX_LONG,
         credentials=None,
         credentials_from_file=False,
-        tls_server_override=None
+        tls_server_override=None,
     ):
         self.username = username
         self.password = password
@@ -56,14 +67,20 @@ class Client(object):
         )
 
     def __repr__(self):
-        return '%s(Host = %s, Port = %s, User = %s, Password = %s, Timeout = %s)' % (
-            self.__class__.__name__,
-            self._host,
-            self._port,
-            self._metadata[0][1],
-            self._metadata[1][1],
-            self._timeout
+        """JSON dump a dict of basic attributes."""
+        return json.dumps(
+            {
+                "target": self.__target,
+                "is_secure": bool(self.__credentials),
+                "username": self.username,
+                "password": self.password,
+                "timeout": self.timeout,
+            }
         )
+
+    def __gen_metadata(self):
+        """Generates expected gRPC call metadata."""
+        return [("username", self.username), ("password", self.password)]
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
@@ -73,12 +90,19 @@ class Client(object):
         to restrict the set of data that is utilized.
         Reference: gNMI Specification Section 3.2
         """
-        message = gnmi_pb2.CapabilityRequest()
-        responses = self._stub.Capabilities(message, metadata=self._metadata)
+        message = proto.CapabilityRequest()
+        responses = self.__client.Capabilities(message, metadata=self.__gen_metadata())
         return responses
-    
-    def get(self, path, prefix=None, gnmi_type=None,
-            encoding=0, user_models=None, extension=None):
+
+    def get(
+        self,
+        path,
+        prefix=None,
+        gnmi_type=None,
+        encoding=0,
+        user_models=None,
+        extension=None,
+    ):
         """
         A snapshot of the state that exists on the target
         :param path: A set of paths to request data snapshot
@@ -96,16 +120,19 @@ class Client(object):
         :return: Return the response object
         :rtype:
         """
-        request = gnmi_pb2.GetRequest(
+        request = proto.GetRequest(
             path=path,
             prefix=prefix,
             type=gnmi_type,
             encoding=encoding,
             user_models=user_models,
-            extension=extension)
-        response = self._stub.Get(request, metadata=self._metadata)
+            extension=extension,
+        )
+        response = self.__client.Get(request, metadata=self.__gen_metadata())
         return response
     
+    def get_xpath(self, xpath, gnmi_type, encoding)
+
     def set(self, prefix=None, update=None, replace=None, delete=None, extension=None):
         """
         Modifications to the state of the target are made through the Set RPC.
@@ -122,46 +149,12 @@ class Client(object):
         :type delete:
         :return: SetResonse with the following fields: prefix, response, extension
         """
-        request = gnmi_pb2.SetRequest(
-            prefix=prefix,
-            update=update,
-            replace=replace,
-            delete=delete)
-        response = self._stub.Set(request, metadata=self._metadata)
+        request = proto.SetRequest(
+            prefix=prefix, update=update, replace=replace, delete=delete
+        )
+        response = self.__client.Set(request, metadata=self.__gen_metadata())
         return response
-    
-    def subscribe(self, subs, interval_seconds, encoding=2):
-        """
-        Subscription to receive updates relating to the state of data instances on a target
-        :param subs: Subscription paths to subscribe to
-        :param interval_seconds: Time of subscription path
-        :param encoding: Defaults to Proto, 1, JSON
-        :type subs: list
-        :type interval_seconds: int
-        :type encoding: int
-        :return: Telemetry stream
-        """
-        subscriptions = []
-        interval = interval_seconds * 1000000000 # convert to ns
-        for sub in subs:
-            pathelems = []
-            for pathlevel in sub.split("/"):
-                pathelems.append(gnmi_pb2.PathElem(name=pathlevel))
-            path = gnmi_pb2.Path(elem=pathelems)
-            subscriptions.append(gnmi_pb2.Subscription(path=path, sample_interval=interval, mode="SAMPLE"))
-        sublist = gnmi_pb2.SubscriptionList(subscriptions=subscriptions,encoding=encoding)
-        subreq = [gnmi_pb2.SubscribeRequest(subscribe=sublist)]
-        stream = self._stub.Subscribe(subreq, metadata=self._metadata)
-        for unit in stream:
-            yield unit
 
-    def connectivityhandler(self, callback):
-        """Passing of a callback to monitor connectivety state updates.
-        :param callback: A callback for monitoring
-        :type: function
-        """
-        self._channel.subscribe(callback, True)
-    
     @staticmethod
     def __gen_target(target, netloc_prefix="//", default_port=50051):
         """Parses and validates a supplied target URL for gRPC calls.
@@ -174,7 +167,7 @@ class Client(object):
             target = netloc_prefix + target
         parsed_target = urlparse(target)
         if not parsed_target.netloc:
-            raise ValueError("Unable to parse netloc from target URL %s!", target)
+            raise ValueError("Unable to parse netloc from target URL %s!" % target)
         if parsed_target.scheme:
             logging.debug("Scheme identified in target, ignoring and using netloc.")
         target_netloc = parsed_target.netloc
@@ -192,11 +185,11 @@ class Client(object):
         client = None
         if not credentials:
             insecure_channel = grpc.insecure_channel(target)
-            client = proto.gRPCConfigOperStub(insecure_channel)
+            client = proto.gNMIStub(insecure_channel)
         else:
             channel_creds = grpc.ssl_channel_credentials(credentials)
             secure_channel = grpc.secure_channel(target, channel_creds, options)
-            client = proto.gRPCConfigOperStub(secure_channel)
+            client = proto.gNMIStub(secure_channel)
         return client
 
     @staticmethod

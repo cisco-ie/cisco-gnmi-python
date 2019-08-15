@@ -1,1 +1,1 @@
-from .gnmi_client import GNMIClient
+from .client import GNMIClient
