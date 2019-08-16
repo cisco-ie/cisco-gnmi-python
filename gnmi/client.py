@@ -55,15 +55,17 @@ class Client(object):
         credentials=None,
         credentials_from_file=False,
         tls_server_override=None,
+        tls_enabled=True,
     ):
         self.username = username
         self.password = password
         self.timeout = int(timeout)
+        self.tls_enabled = tls_enabled
         self.__target = self.__gen_target(target)
         self.__credentials = self.__gen_credentials(credentials, credentials_from_file)
         self.__options = self.__gen_options(tls_server_override)
         self.__client = self.__gen_client(
-            self.__target, self.__credentials, self.__options
+            self.__target, self.__credentials, self.__options, self.tls_enabled
         )
 
     def __repr__(self):
@@ -71,6 +73,7 @@ class Client(object):
         return json.dumps(
             {
                 "target": self.__target,
+                "tls_enabled": self.tls_enabled,
                 "is_secure": bool(self.__credentials),
                 "username": self.username,
                 "password": self.password,
@@ -120,15 +123,22 @@ class Client(object):
         :return: Return the response object
         :rtype:
         """
-        self.__check_proto_enum('data_type', data_type, 'GetRequest.DataType', proto.gnmi_pb2.GetRequest.DataType)
-        self.__check_proto_enum('encoding', encoding, 'Encoding', proto.gnmi_pb2.Encoding)
+        self.__check_proto_enum(
+            "data_type",
+            data_type,
+            "GetRequest.DataType",
+            proto.gnmi_pb2.GetRequest.DataType,
+        )
+        self.__check_proto_enum(
+            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
+        )
         request = proto.gnmi_pb2.GetRequest(
             path=path,
             prefix=prefix,
             type=data_type,
             encoding=encoding,
-            use_models=use_models, 
-            extension=extension
+            use_models=use_models,
+            extension=extension,
         )
         response = self.__client.Get(request, metadata=self.__gen_metadata())
         return response
@@ -195,12 +205,15 @@ class Client(object):
         return target_netloc
 
     @staticmethod
-    def __gen_client(target, credentials=None, options=None):
+    def __gen_client(target, credentials=None, options=None, tls_enabled=True):
         """Instantiates and returns the NX-OS gRPC client stub
         over an insecure or secure channel.
         """
         client = None
-        if not credentials:
+        if not tls_enabled:
+            logging.warning(
+                "TLS MUST be enabled per gNMI specification. If your gNMI implementation works without TLS, it is non-compliant."
+            )
             insecure_channel = grpc.insecure_channel(target)
             client = proto.gnmi_pb2_grpc.gNMIStub(insecure_channel)
         else:
@@ -251,15 +264,15 @@ class Client(object):
             if not message:
                 message = "%s must be one of %s" % (name, ", ".join(valid_options))
             raise ValueError(message)
-    
+
     @staticmethod
     def __check_proto_enum(value_name, value, enum_name, enum):
         if value not in enum.keys() or value not in enum.values():
             raise Exception(
-                '{name}={value} not in {enum_name} enum! Please try any of {options}.'.format(
+                "{name}={value} not in {enum_name} enum! Please try any of {options}.".format(
                     name=value_name,
                     value=str(value),
                     enum_name=enum_name,
-                    options=str(enum.keys())
+                    options=str(enum.keys()),
                 )
             )
