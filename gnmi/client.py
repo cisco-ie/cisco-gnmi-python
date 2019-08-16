@@ -101,8 +101,8 @@ class Client(object):
         self,
         path,
         prefix=None,
-        data_type=proto.types.GetRequest_DataType.ALL,
-        encoding=proto.types.Encoding.JSON_IETF,
+        data_type=proto.gnmi_pb2.GetRequest.DataType.ALL,
+        encoding=proto.gnmi_pb2.Encoding.JSON_IETF,
         use_models=None,
         extension=None,
     ):
@@ -146,8 +146,8 @@ class Client(object):
     def get_xpaths(
         self,
         xpaths,
-        data_type=proto.types.GetRequest_DataType.ALL,
-        encoding=proto.types.Encoding.JSON_IETF,
+        data_type=proto.gnmi_pb2.GetRequest.DataType.ALL,
+        encoding=proto.gnmi_pb2.Encoding.JSON_IETF,
     ):
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
@@ -251,10 +251,8 @@ class Client(object):
         path = proto.gnmi_pb2.Path()
         if xpath.startswith("openconfig") or xpath.startswith("oc"):
             path.origin = "openconfig"
-        path_elements = []
         for element in xpath.split("/"):
-            path_elements.append(proto.gnmi_pb2.PathElem(name=element))
-        path.elem = path_elements
+            path.elem.append(proto.gnmi_pb2.PathElem(name=element))
         return path
 
     @staticmethod
