@@ -123,13 +123,13 @@ class Client(object):
         :return: Return the response object
         :rtype:
         """
-        self.__check_proto_enum(
+        data_type = self.__check_proto_enum(
             "data_type",
             data_type,
             "GetRequest.DataType",
             proto.gnmi_pb2.GetRequest.DataType,
         )
-        self.__check_proto_enum(
+        encoding = self.__check_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         request = proto.gnmi_pb2.GetRequest(
@@ -146,8 +146,8 @@ class Client(object):
     def get_xpaths(
         self,
         xpaths,
-        data_type=proto.gnmi_pb2.GetRequest.DataType.ALL,
-        encoding=proto.gnmi_pb2.Encoding.JSON_IETF,
+        data_type='ALL',
+        encoding='JSON_IETF',
     ):
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
@@ -249,8 +249,6 @@ class Client(object):
         if not isinstance(xpath, str):
             raise Exception("xpath must be a string!")
         path = proto.gnmi_pb2.Path()
-        if xpath.startswith("openconfig") or xpath.startswith("oc"):
-            path.origin = "openconfig"
         for element in xpath.split("/"):
             path.elem.append(proto.gnmi_pb2.PathElem(name=element))
         return path
@@ -265,7 +263,8 @@ class Client(object):
 
     @staticmethod
     def __check_proto_enum(value_name, value, enum_name, enum):
-        if value not in enum.keys() or value not in enum.values():
+        enum_value = None
+        if value not in enum.keys() and value not in enum.values():
             raise Exception(
                 "{name}={value} not in {enum_name} enum! Please try any of {options}.".format(
                     name=value_name,
@@ -274,3 +273,8 @@ class Client(object):
                     options=str(enum.keys()),
                 )
             )
+        if value in enum.keys():
+            enum_value = enum.Value(value)
+        else:
+            enum_value = value
+        return enum_value
