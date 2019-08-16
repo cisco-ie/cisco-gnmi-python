@@ -133,7 +133,11 @@ class Client(object):
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         request = proto.gnmi_pb2.GetRequest()
-        request.path = path
+        if not isinstance(path, (list, set)):
+            request.path.append(path)
+        else:
+            for single_path in path:
+                request.path.append(single_path)
         request.type = data_type
         request.encoding = encoding
         if prefix:
@@ -155,7 +159,7 @@ class Client(object):
         if isinstance(xpaths, (list, set)):
             gnmi_path = map(self.__parse_xpath_to_gnmi_path, set(xpaths))
         elif isinstance(xpaths, str):
-            gnmi_path = self.__parse_xpath_to_gnmi_path(xpaths)
+            gnmi_path = [self.__parse_xpath_to_gnmi_path(xpaths)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
