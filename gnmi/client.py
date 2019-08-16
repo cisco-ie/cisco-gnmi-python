@@ -120,13 +120,15 @@ class Client(object):
         :return: Return the response object
         :rtype:
         """
+        self.__check_proto_enum('data_type', data_type, 'GetRequest.DataType', proto.gnmi_pb2.GetRequest.DataType)
+        self.__check_proto_enum('encoding', encoding, 'Encoding', proto.gnmi_pb2.Encoding)
         request = proto.gnmi_pb2.GetRequest(
             path=path,
             prefix=prefix,
             type=data_type,
             encoding=encoding,
-            use_models=use_models,
-            extension=extension,
+            use_models=use_models, 
+            extension=extension
         )
         response = self.__client.Get(request, metadata=self.__gen_metadata())
         return response
@@ -249,3 +251,15 @@ class Client(object):
             if not message:
                 message = "%s must be one of %s" % (name, ", ".join(valid_options))
             raise ValueError(message)
+    
+    @staticmethod
+    def __check_proto_enum(value_name, value, enum_name, enum):
+        if value not in enum.keys() or value not in enum.values():
+            raise Exception(
+                '{name}={value} not in {enum_name} enum! Please try any of {options}.'.format(
+                    name=value_name,
+                    value=str(value),
+                    enum_name=enum_name,
+                    options=str(enum.keys())
+                )
+            )
