@@ -37,7 +37,31 @@ from . import proto
 
 
 class Client(object):
-    """This class creates grpc calls using python.
+    """gNMI gRPC wrapper client to ease usage of gNMI.
+
+    Returns relatively raw response data. Response data may be accessed according
+    to the gNMI specification.
+
+    Attributes
+    ----------
+    username : str
+    password : str
+    timeout : uint
+    tls_enabled : bool
+
+    Methods
+    -------
+    get(...)
+        Get a snapshot of config, state, operational, or all forms of data.
+    set(...)
+        Update, replace, or delete configuration.
+    
+    Examples
+    --------
+    >>> from gnmi import Client
+    >>> client = Client('127.0.0.1:57400', 'demo', 'demo')
+    >>> get_response = client.get_xpaths('interfaces/interface')
+    ...
     """
 
     """Defining property due to gRPC timeout being based on a C long type.
@@ -57,6 +81,28 @@ class Client(object):
         tls_server_override=None,
         tls_enabled=True,
     ):
+        """Initializes the gNMI gRPC client stub and defines auxiliary attributes.
+
+        Parameters
+        ----------
+        target : str
+            The host[:port] to issue gNMI requests against.
+        username : str
+        password : str
+        timeout : uint, optional
+            Timeout for request which sets a deadline for return.
+            Defaults to "infinity"
+        credentials : str, optional
+            PEM contents or PEM file path.
+        credentials_from_file : bool, optional
+            Indicates that credentials is a file path.
+        tls_server_override : str, optional
+            TLS server name if PEM will not match.
+            Please only utilize in testing.
+        tls_enabled : bool, optional
+            Whether or not to utilize a secure channel.
+            If disabled, and functional, gNMI server is against specification.
+        """
         self.username = username
         self.password = password
         self.timeout = int(timeout)
@@ -92,6 +138,10 @@ class Client(object):
         the target supports. The models can then be specified in subsequent RPCs
         to restrict the set of data that is utilized.
         Reference: gNMI Specification Section 3.2
+
+        Returns
+        -------
+        proto.gnmi_pb2.CapabilityResponse
         """
         message = proto.gnmi_pb2.CapabilityRequest()
         response = self.__client.Capabilities(message, metadata=self.__gen_metadata())
@@ -99,29 +149,34 @@ class Client(object):
 
     def get(
         self,
-        path,
-        prefix=None,
+        paths,
+        paths_prefix=None,
         data_type=proto.gnmi_pb2.GetRequest.DataType.ALL,
         encoding=proto.gnmi_pb2.Encoding.JSON_IETF,
         use_models=None,
         extension=None,
     ):
-        """
-        A snapshot of the state that exists on the target
-        :param path: A set of paths to request data snapshot
-        :param prefix: a path that is applied to all paths
-        :param data_type: type of data requested [CONFIG, STATE, OPERATIONAL]
-        :param encoding: Data format data comes out in 2=Proto, 0=JSON
-        :param use_models: ModelData messages indicating the schema definition
-        :param extension: a repeated field to carry gNMI extensions
-        :type path:
-        :type prefix:
-        :type gnmi_type: string
-        :type encoding: int
-        :type use_models:
-        :type extension:
-        :return: Return the response object
-        :rtype:
+        """A snapshot of the requested data that exists on the target.
+
+        Parameters
+        ----------
+        paths : iterable of proto.gnmi_pb2.Path
+            An iterable of Paths to request data of.
+        prefix : proto.gnmi_pb2.Path, optional
+            A path to prefix all Paths in paths
+        data_type : proto.gnmi_pb2.GetRequest.DataType, optional
+            A member of the GetRequest.DataType enum to specify what datastore to target
+            [ALL, CONFIG, STATE, OPERATIONAL]
+        encoding : proto.gnmi_pb2.Encoding, optional
+            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
+            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
+        use_models : iterable of proto.gnmi_pb2.ModelData, optional
+        extension : iterable of proto.gnmi_ext.Extension, optional
+
+        Returns
+        -------
+        proto.gnmi_pb2.GetResponse
+            The GetResponse object containing data. This response is not wrapped.
         """
         data_type = self.__check_proto_enum(
             "data_type",
@@ -133,11 +188,9 @@ class Client(object):
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         request = proto.gnmi_pb2.GetRequest()
-        if not isinstance(path, (list, set)):
-            request.path.append(path)
-        else:
-            for single_path in path:
-                request.path.append(single_path)
+        if not isinstance(paths, (list, set)):
+            raise Exception("paths must be an iterable containing Path(s)!")
+        map(request.path.append, paths)
         request.type = data_type
         request.encoding = encoding
         if prefix:
@@ -146,15 +199,26 @@ class Client(object):
             request.use_models = use_models
         if extension:
             request.extension = extension
-        response = self.__client.Get(request, metadata=self.__gen_metadata())
-        return response
+        get_response = self.__client.Get(request, metadata=self.__gen_metadata())
+        return get_response
 
-    def get_xpaths(
-        self,
-        xpaths,
-        data_type='ALL',
-        encoding='JSON_IETF',
-    ):
+    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
+        """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
+
+        Parameters
+        ----------
+        xpaths : iterable of str or str
+            An iterable of XPath strings to request data of
+            If simply a str, wraps as a list for convenience
+        data_type : proto.gnmi_pb2.GetRequest.DataType, optional
+            A direct value or key from the GetRequest.DataType enum
+        encoding : proto.gnmi_pb2.GetRequest.Encoding, optional
+            A direct value or key from the Encoding enum
+
+        Returns
+        -------
+        get()
+        """
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
             gnmi_path = map(self.__parse_xpath_to_gnmi_path, set(xpaths))
@@ -212,8 +276,8 @@ class Client(object):
 
     @staticmethod
     def __gen_client(target, credentials=None, options=None, tls_enabled=True):
-        """Instantiates and returns the NX-OS gRPC client stub
-        over an insecure or secure channel.
+        """Instantiates and returns the gNMI gRPC client stub over
+        an insecure or secure channel.
         """
         client = None
         if not tls_enabled:
