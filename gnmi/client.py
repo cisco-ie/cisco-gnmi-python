@@ -132,14 +132,16 @@ class Client(object):
         encoding = self.__check_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
-        request = proto.gnmi_pb2.GetRequest(
-            path=path,
-            prefix=prefix,
-            type=data_type,
-            encoding=encoding,
-            use_models=use_models,
-            extension=extension,
-        )
+        request = proto.gnmi_pb2.GetRequest()
+        request.path = path
+        request.type = data_type
+        request.encoding = encoding
+        if prefix:
+            request.prefix = prefix
+        if use_models:
+            request.use_models = use_models
+        if extension:
+            request.extension = extension
         response = self.__client.Get(request, metadata=self.__gen_metadata())
         return response
 
