@@ -176,7 +176,6 @@ class Client(object):
         Returns
         -------
         proto.gnmi_pb2.GetResponse
-            The GetResponse object containing data. This response is not wrapped.
         """
         data_type = self.__check_proto_enum(
             "data_type",
@@ -230,27 +229,110 @@ class Client(object):
             )
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
-    def set(self, prefix=None, update=None, replace=None, delete=None, extension=None):
+    def set(
+        self, prefix=None, updates=None, replaces=None, deletes=None, extensions=None
+    ):
+        """Modifications to the configuration of the target.
+
+        Parameters
+        ----------
+        prefix : proto.gnmi_pb2.Path, optional
+            The Path to prefix all other Paths defined within other messages
+        update : iterable of proto.gnmi_pb2.Update, optional
+            The Updates to update configuration with.
+        replace : proto.gnmi_pb2.Update, optional
+            The Updates which replaces other configuration.
+            The main difference between replace and update is replace will remove non-referenced nodes.
+        delete : proto.gnmi_pb2.Update, optional
+            The Updates which refers to elements for deletion.
+        extensions : iterable of proto.gnmi_ext.Extension, optional
+
+        Returns
+        -------
+        proto.gnmi_pb2.SetResponse
         """
-        Modifications to the state of the target are made through the Set RPC.
-        A client sends a SetRequest message to the target indicating the modifications
-        it desires.
-        :param prefix: The prefix specified is applied to all paths defined within other fields of the message.
-        :param update: A set of messages indicating elements of the data tree whose content is to be updated
-        :param replace: A set of messages indicating elements of the data tree whose contents is to be replaced
-        :param delete: A set of paths which are to be removed from the data tree.
-        :param extension: Repeated field used to carry gNMI extensions
-        :type prefix:
-        :type update:
-        :type replace:
-        :type delete:
-        :return: SetResonse with the following fields: prefix, response, extension
-        """
-        request = proto.gnmi_pb2.SetRequest(
-            prefix=prefix, update=update, replace=replace, delete=delete
-        )
+        request = proto.gnmi_pb2.SetRequest()
+        if prefix:
+            request.prefix = prefix
+        for item in [updates, replaces, deletes]:
+            if not item:
+                continue
+            if not isinstance(item, (list, set)):
+                raise Exception("updates, replaces, and deletes must be iterables!")
+        if updates:
+            map(request.update.append, updates)
+        if replaces:
+            map(request.replace.append, replaces)
+        if deletes:
+            map(request.delete.append, deletes)
+        if extensions:
+            map(request.extension.append, extensions)
         response = self.__client.Set(request, metadata=self.__gen_metadata())
         return response
+
+    def set_json(
+        self,
+        update_json_configs=None,
+        replace_json_configs=None,
+        delete_json_configs=None,
+        ietf=True,
+    ):
+        """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
+        All parameters are optional, but at least one must be present.
+
+        Parameters
+        ----------
+        update_json_configs : iterable of JSON configurations, optional
+            JSON configs to apply as updates.
+        replace_json_configs : iterable of JSON configurations, optional
+            JSON configs to apply as replacements.
+        delete_json_configs : iterable of JSON configurations, optional
+            JSON configs to apply as deletions.
+        ietf : bool, optional
+            Use JSON_IETF vs JSON.
+        
+        Returns
+        -------
+        set()
+        """
+        if not any([update_json_configs, replace_json_configs, delete_json_configs]):
+            raise Exception("Must supply at least one set of configurations to method!")
+
+        def check_configs(name, configs):
+            if isinstance(name, str):
+                logging.debug("Handling %s as JSON string.", name)
+                try:
+                    json.loads(name)
+                except:
+                    raise Exception("{name} is invalid JSON!".format(name=name))
+                configs = [configs]
+            elif isinstance(name, dict):
+                logging.debug("Handling %s as already serialized JSON object.", name)
+                configs = [json.dumps(configs)]
+            elif not isinstance(configs, (list, set)):
+                raise Exception(
+                    "{name} must be an iterable of config strings!".format(name=name)
+                )
+            return configs
+
+        def create_updates(name, configs):
+            if not configs:
+                return
+            configs = check_configs(name, configs)
+            updates = []
+            for config in configs:
+                update = proto.gnmi_pb2.Update()
+                if ietf:
+                    update.val = proto.gnmi_pb2.TypedValue(json_ietf_val=config)
+                else:
+                    update.val = proto.gnmi_pb2.TypedValue(json_val=config)
+                updates.append(update)
+            return updates
+
+        updates = create_updates("update_json_configs", update_json_configs)
+        replaces = create_updates("replace_json_configs", replace_json_configs)
+        deletes = create_updates("delete_json_configs", delete_json_configs)
+        return self.set(updates=updates, replaces=replaces, deletes=deletes)
 
     @staticmethod
     def __gen_target(target, netloc_prefix="//", default_port=50051):
