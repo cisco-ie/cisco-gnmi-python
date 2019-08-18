@@ -1,4 +1,5 @@
-"""Copyright 2019 Cisco Systems All rights reserved.
+"""Copyright 2019 Cisco Systems
+All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -20,7 +21,7 @@ License for the specific language governing permissions and limitations under
 the License.
 """
 
-"""Python gNMI wrapper to ease usage."""
+"""Python gNMI wrapper to ease usage of gNMI."""
 
 import logging
 import json
@@ -69,6 +70,8 @@ class Client(object):
     32-bit C long max value. "Infinity".
     """
     __C_MAX_LONG = 2147483647
+
+    __NS_IN_S = int(1e9)
 
     def __init__(
         self,
@@ -333,6 +336,158 @@ class Client(object):
         replaces = create_updates("replace_json_configs", replace_json_configs)
         deletes = create_updates("delete_json_configs", delete_json_configs)
         return self.set(updates=updates, replaces=replaces, deletes=deletes)
+
+    def subscribe(self, request_iter, extensions=None):
+        """Subscribe allows a client to request the target to send it values
+        of particular paths within the data tree. These values may be streamed
+        at a particular cadence (STREAM), sent one off on a long-lived channel
+        (POLL), or sent as a one-off retrieval (ONCE).
+        Reference: gNMI Specification Section 3.5
+
+        Parameters
+        ----------
+        request_iter : iterable of proto.gnmi_pb2.SubscriptionList or proto.gnmi_pb2.Poll or proto.gnmi_pb2.AliasList
+            The requests to embed as the SubscribeRequest, oneof the above.
+            subscribe RPC is a streaming request thus can arbitrarily generate SubscribeRequests into request_iter
+            to use the same bi-directional streaming connection if already open.
+        extensions : iterable of proto.gnmi_ext.Extension, optional
+
+        Returns
+        -------
+        generator of SubscriptionResponse
+        """
+
+        def validate_request(request):
+            subscribe_request = proto.gnmi_pb2.SubscribeRequest()
+            if isinstance(request, proto.gnmi_pb2.SubscriptionList):
+                subscribe_request.subscribe.CopyFrom(request)
+            elif isinstance(request, proto.gnmi_pb2.Poll):
+                subscribe_request.poll.CopyFrom(request)
+            elif isinstance(request, proto.gnmi_pb2.AliasList):
+                subscribe_request.aliases.CopyFrom(request)
+            else:
+                raise Exception(
+                    "request must be a SubscriptionList, Poll, or AliasList!"
+                )
+            if extensions:
+                map(subscribe_request.extensions.append, extensions)
+            return subscribe_request
+
+        response_stream = self.__client.Subscribe(
+            (validate_request(request) for request in request_iter),
+            metadata=self.__gen_metadata(),
+        )
+        return response_stream
+
+    def subscribe_xpaths(
+        self,
+        xpath_subscriptions,
+        request_mode="STREAM",
+        sub_mode="SAMPLE",
+        encoding="PROTO",
+        sample_interval=__NS_IN_S * 5,
+        suppress_redundant=False,
+        heartbeat_interval=None,
+    ):
+        """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
+        with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
+        dictionaries with Subscription attributes for more granularity, or already built Subscription
+        objects and builds the SubscriptionList. Fields not supplied will be defaulted with the default arguments
+        to the method.
+
+        Generates a single SubscribeRequest.
+
+        Parameters
+        ----------
+        xpath_subscriptions : iterable of str, dict, Subscription
+            An iterable which is parsed to form the Subscriptions in the SubscriptionList to be passed
+            to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
+            dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
+            treated as simply a pre-made Subscription.
+        request_mode : proto.gnmi_pb2.SubscriptionList.Mode, optional
+            Indicates whether STREAM to stream from target,
+            ONCE to stream once (like a get),
+            POLL to respond to POLL.
+            [STREAM, ONCE, POLL]
+        sub_mode : proto.gnmi_pb2.SubscriptionMode, optional
+            The default SubscriptionMode on a per Subscription basis in the SubscriptionList.
+            TARGET_DEFINED indicates that the target (like device/destination) should stream
+            information however it knows best. This instructs the target to decide between ON_CHANGE
+            or SAMPLE - e.g. the device gNMI server may understand that we only need RIB updates
+            as an ON_CHANGE basis as opposed to SAMPLE, and we don't have to explicitly state our
+            desired behavior.
+            ON_CHANGE only streams updates when changes occur.
+            SAMPLE will stream the subscription at a regular cadence/interval. 
+            [TARGET_DEFINED, ON_CHANGE, SAMPLE]
+        encoding : proto.gnmi_pb2.Encoding, optional
+            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
+            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
+        sample_interval : int, optional
+            Default nanoseconds for sample to occur.
+            Defaults to 5 seconds.
+        suppress_redundant : bool, optional
+            Indicates whether values that have not changed should be sent in a SAMPLE subscription.
+        heartbeat_interval : int, optional
+            Specifies the maximum allowable silent period in nanoseconds when
+            suppress_redundant is in use. The target should send a value at least once
+            in the period specified.
+        
+        Returns
+        -------
+        subscribe()
+        """
+        subscription_list = proto.gnmi_pb2.SubscriptionList()
+        subscription_list.mode = self.__check_proto_enum(
+            "mode",
+            request_mode,
+            "SubscriptionList.Mode",
+            proto.gnmi_pb2.SubscriptionList.Mode,
+        )
+        subscription_list.encoding = self.__check_proto_enum(
+            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
+        )
+        for xpath_subscription in xpath_subscriptions:
+            subscription = None
+            if isinstance(xpath_subscription, str):
+                subscription = proto.gnmi_pb2.Subscription()
+                subscription.path.CopyFrom(
+                    self.__parse_xpath_to_gnmi_path(xpath_subscription)
+                )
+                subscription.mode = self.__check_proto_enum(
+                    "sub_mode",
+                    sub_mode,
+                    "SubscriptionMode",
+                    proto.gnmi_pb2.SubscriptionMode,
+                )
+                subscription.sample_interval = sample_interval
+                subscription.suppress_redundant = suppress_redundant
+                if heartbeat_interval:
+                    subscription.heartbeat_interval = heartbeat_interval
+            elif isinstance(xpath_subscription, dict):
+                path = self.__parse_xpath_to_gnmi_path(xpath_subscription["path"])
+                arg_dict = {
+                    "path": path,
+                    "mode": sub_mode,
+                    "sample_interval": sample_interval,
+                    "suppress_redundant": suppress_redundant,
+                }
+                if heartbeat_interval:
+                    arg_dict["heartbeat_interval"] = heartbeat_interval
+                arg_dict.update(xpath_subscription)
+                if "mode" in arg_dict:
+                    arg_dict["mode"] = self.__check_proto_enum(
+                        "sub_mode",
+                        arg_dict["mode"],
+                        "SubscriptionMode",
+                        proto.gnmi_pb2.SubscriptionMode,
+                    )
+                subscription = proto.gnmi_pb2.Subscription(**arg_dict)
+            elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
+                subscription = xpath_subscription
+            else:
+                raise Exception("xpath in list must be xpath or dict/Path!")
+            subscription_list.subscription.append(subscription)
+        return self.subscribe([subscription_list])
 
     @staticmethod
     def __gen_target(target, netloc_prefix="//", default_port=50051):
