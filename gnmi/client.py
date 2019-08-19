@@ -446,6 +446,8 @@ class Client(object):
         subscription_list.encoding = self.__check_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
+        if isinstance(xpath_subscriptions, str):
+            xpath_subscriptions = [xpath_subscriptions]
         for xpath_subscription in xpath_subscriptions:
             subscription = None
             if isinstance(xpath_subscription, str):
