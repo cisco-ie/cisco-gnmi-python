@@ -153,7 +153,7 @@ class Client(object):
     def get(
         self,
         paths,
-        paths_prefix=None,
+        prefix=None,
         data_type=proto.gnmi_pb2.GetRequest.DataType.ALL,
         encoding=proto.gnmi_pb2.Encoding.JSON_IETF,
         use_models=None,
