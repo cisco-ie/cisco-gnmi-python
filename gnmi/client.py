@@ -66,7 +66,7 @@ class Client(object):
         Stream snapshots of data from the device.
     subscribe_xpaths(...)
         Convenience wrapper for subscribe() which helps construct subscriptions for specified xpaths.
-    
+
     Examples
     --------
     >>> from gnmi import Client
@@ -280,7 +280,7 @@ class Client(object):
             request.prefix = prefix
         test_list = [updates, replaces, deletes]
         if not any(test_list):
-            raise Exception('At least update, replace, or delete must be specified!')
+            raise Exception("At least update, replace, or delete must be specified!")
         for item in test_list:
             if not item:
                 continue
@@ -317,7 +317,7 @@ class Client(object):
             JSON configs to apply as deletions.
         ietf : bool, optional
             Use JSON_IETF vs JSON.
-        
+
         Returns
         -------
         set()
@@ -350,9 +350,9 @@ class Client(object):
             for config in configs:
                 update = proto.gnmi_pb2.Update()
                 if ietf:
-                    update.val.json_ietf_val = config.encode('utf-8')
+                    update.val.json_ietf_val = config.encode("utf-8")
                 else:
-                    update.val.json_val = config.encode('utf-8')
+                    update.val.json_val = config.encode("utf-8")
                 updates.append(update)
             return updates
 
@@ -455,7 +455,7 @@ class Client(object):
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
             in the period specified.
-        
+
         Returns
         -------
         subscribe()

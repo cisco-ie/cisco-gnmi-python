@@ -1,2 +1,64 @@
 # gnmi-python
-gNMI Python connectivity library. 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
+
+This library wraps gNMI functionality to ease usage in Python programs. Derived from [openconfig/gnmi](https://github.com/openconfig/gnmi/proto/gnmi/gnmi.proto).
+
+## Usage
+```bash
+# TBD
+#pip install gnmi
+```
+
+This library covers the gNMI defined `capabilities`, `get`, `set`, and `subscribe` RPCs, and provides the `get_xpaths`, `set_json`, and `subscribe_xpaths` convenience methods. It is *highly* recommended that users of the library learn [Google Protocol Buffers](https://developers.google.com/protocol-buffers/) syntax to significantly ease usage. Understanding how to read Protocol Buffers, and reference the `gnmi.proto`, will be immensely useful for utilizing gNMI and any other gRPC interface.
+
+Methods are documented in [`gnmi/client.py`](gnmi/client.py).
+
+## gNMI
+gRPC Network Management Interface (gNMI) is a service defining an interface for a network management system to interact with a network element. It may be thought of as akin to NETCONF or other control protocols which define operations and behaviors. The scope of gNMI is relatively simple - it seeks to "[[define](https://github.com/openconfig/reference/blob/master/rpc/gnmi/gnmi-specification.md)] a gRPC-based protocol for the modification and retrieval of configuration from a target device, as well as the control and generation of telemetry streams from a target device to a data collection system. The intention is that a single gRPC service definition can cover both configuration and telemetry - allowing a single implementation on the target, as well as a single NMS element to interact with the device via telemetry and configuration RPCs".
+
+gNMI is a specification developed by [OpenConfig](https://openconfig.net), an operator-driven working-group. It is important to note that gNMI only defines a protocol of behavior - not data models. This is akin to SNMP/MIBs and NETCONF/YANG. SNMP and NETCONF are respectively decoupled from the data itself in MIBs and YANG modules. gNMI is a control protocol, not a standardization of data. OpenConfig does develop standard data models as well, and does have some specialized behavior with OpenConfig originating models, but the data models themselves are out of the scope of gNMI.
+
+This library is written largely to accomodate any gNMI implementation, but does target some Cisco-specifics purely by nature of being tested against Cisco implementations. For example, the `set_json` convenience method.
+
+## Development
+Requires Python and utilizes `pipenv` for environment management. Manual usage of `pip`/`virtualenv` is not covered. Uses `black` for code formatting and `pylint` for code linting.
+
+### Get Source
+```bash
+git clone https://github.com/cisco-ie/gnmi-python.git
+cd gnmi-python
+# If pipenv not installed, install!
+pip install --user pipenv
+# Now use pipenv
+pipenv --three install
+# Enter virtual environment
+pipenv shell
+# Do your thing.
+exit
+```
+
+### Clean Code
+We use [`black`](https://github.com/ambv/black) for code formatting and [`pylint`](https://www.pylint.org/) for code linting. `clean_code.sh` will run `black` against all of the code under `gnmi/` except for `protoc` compiled protobufs, and run `pylint` against Python files directly under `gnmi/`. They don't totally agree, so we're not looking for perfection here.
+
+```bash
+./clean_code.sh
+```
+
+### Recompile Protobufs
+If a new `gnmi.proto` definition is released, use `update_protos.sh` to recompile. If breaking changes are introduced the wrapper library must be updated.
+
+```bash
+./update_protos.sh
+```
+
+## Licensing
+`gnmi-python` is licensed as [Apache License, Version 2.0](LICENSE).
+
+## Issues
+Open an issue :)
+
+## Related Projects
+1. [openconfig/gnmi](https://github.com/openconfig-gnmi)
+2. [google/gnxi](https://github.com/google/gnxi)
+3. [Telegraf Cisco gNMI Plugin](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/cisco_telemetry_gnmi)
