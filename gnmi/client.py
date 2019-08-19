@@ -201,13 +201,13 @@ class Client(object):
         -------
         proto.gnmi_pb2.GetResponse
         """
-        data_type = self.__check_proto_enum(
+        data_type = self.__validate_proto_enum(
             "data_type",
             data_type,
             "GetRequest.DataType",
             proto.gnmi_pb2.GetRequest.DataType,
         )
-        encoding = self.__check_proto_enum(
+        encoding = self.__validate_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         request = proto.gnmi_pb2.GetRequest()
@@ -461,13 +461,13 @@ class Client(object):
         subscribe()
         """
         subscription_list = proto.gnmi_pb2.SubscriptionList()
-        subscription_list.mode = self.__check_proto_enum(
+        subscription_list.mode = self.__validate_proto_enum(
             "mode",
             request_mode,
             "SubscriptionList.Mode",
             proto.gnmi_pb2.SubscriptionList.Mode,
         )
-        subscription_list.encoding = self.__check_proto_enum(
+        subscription_list.encoding = self.__validate_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         if isinstance(xpath_subscriptions, str):
@@ -479,7 +479,7 @@ class Client(object):
                 subscription.path.CopyFrom(
                     self.__parse_xpath_to_gnmi_path(xpath_subscription)
                 )
-                subscription.mode = self.__check_proto_enum(
+                subscription.mode = self.__validate_proto_enum(
                     "sub_mode",
                     sub_mode,
                     "SubscriptionMode",
@@ -501,7 +501,7 @@ class Client(object):
                     arg_dict["heartbeat_interval"] = heartbeat_interval
                 arg_dict.update(xpath_subscription)
                 if "mode" in arg_dict:
-                    arg_dict["mode"] = self.__check_proto_enum(
+                    arg_dict["mode"] = self.__validate_proto_enum(
                         "sub_mode",
                         arg_dict["mode"],
                         "SubscriptionMode",
@@ -587,15 +587,7 @@ class Client(object):
         return path
 
     @staticmethod
-    def __validate_enum_arg(name, valid_options, message=None):
-        """Construct error around enumeration validation."""
-        if name not in valid_options:
-            if not message:
-                message = "%s must be one of %s" % (name, ", ".join(valid_options))
-            raise ValueError(message)
-
-    @staticmethod
-    def __check_proto_enum(value_name, value, enum_name, enum):
+    def __validate_proto_enum(value_name, value, enum_name, enum):
         enum_value = None
         if value not in enum.keys() and value not in enum.values():
             raise Exception(
