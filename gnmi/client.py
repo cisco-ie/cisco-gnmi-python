@@ -52,16 +52,37 @@ class Client(object):
 
     Methods
     -------
+    capabilities()
+        Retrieve meta information about version, supported models, etc.
     get(...)
         Get a snapshot of config, state, operational, or all forms of data.
+    get_xpaths(...)
+        Convenience wrapper for get() which helps construct get requests for specified xpaths.
     set(...)
         Update, replace, or delete configuration.
+    set_json(...)
+        Convenience wrapper for set() which assumes model-based JSON payloads.
+    subscribe(...)
+        Stream snapshots of data from the device.
+    subscribe_xpaths(...)
+        Convenience wrapper for subscribe() which helps construct subscriptions for specified xpaths.
     
     Examples
     --------
     >>> from gnmi import Client
-    >>> client = Client('127.0.0.1:57400', 'demo', 'demo')
+    >>> client = Client('127.0.0.1:57400', 'demo', 'demo', credentials='ems.pem', tls_server_override='ems.cisco.com', credentials_from_file=True)
+    >>> capabilities = client.capabilities()
+    >>> print(capabilities)
+    ...
     >>> get_response = client.get_xpaths('interfaces/interface')
+    >>> print(get_response)
+    ...
+    >>> subscribe_response = client.subscribe_xpaths('interfaces/interface')
+    >>> for message in subscribe_response: print(message)
+    ...
+    >>> config = '{"Cisco-IOS-XR-infra-infra-cfg:banners":{"banner": [{"banner-name": "motd", "banner-text": "Hello gNMI!" }]}}'
+    >>> set_response = client.set_json(config)
+    >>> print(set_response)
     ...
     """
 
@@ -257,7 +278,10 @@ class Client(object):
         request = proto.gnmi_pb2.SetRequest()
         if prefix:
             request.prefix = prefix
-        for item in [updates, replaces, deletes]:
+        test_list = [updates, replaces, deletes]
+        if not any(test_list):
+            raise Exception('At least update, replace, or delete must be specified!')
+        for item in test_list:
             if not item:
                 continue
             if not isinstance(item, (list, set)):
@@ -305,7 +329,7 @@ class Client(object):
             if isinstance(name, str):
                 logging.debug("Handling %s as JSON string.", name)
                 try:
-                    json.loads(name)
+                    json.loads(configs)
                 except:
                     raise Exception("{name} is invalid JSON!".format(name=name))
                 configs = [configs]
@@ -320,15 +344,15 @@ class Client(object):
 
         def create_updates(name, configs):
             if not configs:
-                return
+                return None
             configs = check_configs(name, configs)
             updates = []
             for config in configs:
                 update = proto.gnmi_pb2.Update()
                 if ietf:
-                    update.val = proto.gnmi_pb2.TypedValue(json_ietf_val=config)
+                    update.val.json_ietf_val = config.encode('utf-8')
                 else:
-                    update.val = proto.gnmi_pb2.TypedValue(json_val=config)
+                    update.val.json_val = config.encode('utf-8')
                 updates.append(update)
             return updates
 
@@ -399,7 +423,7 @@ class Client(object):
 
         Parameters
         ----------
-        xpath_subscriptions : iterable of str, dict, Subscription
+        xpath_subscriptions : str or iterable of str, dict, Subscription
             An iterable which is parsed to form the Subscriptions in the SubscriptionList to be passed
             to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
             dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
