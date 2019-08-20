@@ -213,7 +213,8 @@ class Client(object):
         request = proto.gnmi_pb2.GetRequest()
         if not isinstance(paths, (list, set)):
             raise Exception("paths must be an iterable containing Path(s)!")
-        map(request.path.append, paths)
+        for path in paths:
+            request.path.append(path)
         request.type = data_type
         request.encoding = encoding
         if prefix:
@@ -287,13 +288,17 @@ class Client(object):
             if not isinstance(item, (list, set)):
                 raise Exception("updates, replaces, and deletes must be iterables!")
         if updates:
-            map(request.update.append, updates)
+            for update in updates:
+                request.update.append(update)
         if replaces:
-            map(request.replace.append, replaces)
+            for update in replaces:
+                request.replace.append(update)
         if deletes:
-            map(request.delete.append, deletes)
+            for update in deletes:
+                request.deletes.append(update)
         if extensions:
-            map(request.extension.append, extensions)
+            for extension in extensions:
+                request.extension.append(extension)
         response = self.__client.Set(request, metadata=self.__gen_metadata())
         return response
 
@@ -394,7 +399,8 @@ class Client(object):
                     "request must be a SubscriptionList, Poll, or AliasList!"
                 )
             if extensions:
-                map(subscribe_request.extensions.append, extensions)
+                for extension in extensions:
+                    subscribe_request.extensions.append(extension)
             return subscribe_request
 
         response_stream = self.__client.Subscribe(
