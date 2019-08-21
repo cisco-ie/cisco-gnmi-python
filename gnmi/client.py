@@ -23,17 +23,8 @@ the License.
 
 """Python gNMI wrapper to ease usage of gNMI."""
 
-import logging
 import json
 
-try:
-    # Python 3
-    from urllib.parse import urlparse
-except ImportError:
-    # Python 2
-    from urlparse import urlparse
-
-import grpc
 from . import proto
 from . import util
 

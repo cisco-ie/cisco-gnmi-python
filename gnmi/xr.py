@@ -21,13 +21,15 @@ License for the specific language governing permissions and limitations under
 the License.
 """
 
+"""Wrapper for IOS XR to simplify usage of gNMI implementation."""
+
 import json
 import logging
 
 from .client import Client, proto, util
 
-class XRClient(Client):
 
+class XRClient(Client):
     def set_json(
         self,
         update_json_configs=None,
@@ -37,6 +39,9 @@ class XRClient(Client):
     ):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
+
+        This method expects JSON in the same format as what you might send via the native gRPC interface
+        with a fully modeled configuration which is then parsed to meet the gNMI implementation.
 
         Parameters
         ----------
@@ -80,24 +85,32 @@ class XRClient(Client):
             updates = []
             for config in configs:
                 if not isinstance(config, dict):
-                    raise Exception('config must be a JSON object!')
+                    raise Exception("config must be a JSON object!")
                 if len(config.keys()) > 1:
-                    raise Exception('config should only target one YANG module!')
-                top_element = config.keys()[0]
-                top_element_split  = top_element.split(':')
+                    raise Exception("config should only target one YANG module!")
+                top_element = next(iter(config.keys()))
+                top_element_split = top_element.split(":")
                 if len(top_element_split) < 2:
-                    raise Exception('Top level config element {} should be module prefixed!'.format(top_element))
-                elif len(top_element_split > 2):
-                    raise Exception('Top level config element {} appears malformed!'.format(top_element))
+                    raise Exception(
+                        "Top level config element {} should be module prefixed!".format(
+                            top_element
+                        )
+                    )
+                elif len(top_element_split) > 2:
+                    raise Exception(
+                        "Top level config element {} appears malformed!".format(
+                            top_element
+                        )
+                    )
                 origin = top_element_split[0]
                 element = top_element_split[1]
                 config = config.pop(top_element)
                 update = proto.gnmi_pb2.Update()
                 update.path.CopyFrom(util.parse_xpath_to_gnmi_path(element, origin))
                 if ietf:
-                    update.val.json_ietf_val = json.dumps(config).encode('utf-8')
+                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
                 else:
-                    update.val.json_val = json.dumps(config).encode('utf-8')
+                    update.val.json_val = json.dumps(config).encode("utf-8")
                 updates.append(update)
             return updates
 
@@ -105,7 +118,6 @@ class XRClient(Client):
         replaces = create_updates("replace_json_configs", replace_json_configs)
         deletes = create_updates("delete_json_configs", delete_json_configs)
         return self.set(updates=updates, replaces=replaces, deletes=deletes)
-
 
     def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
@@ -173,7 +185,7 @@ class XRClient(Client):
             as an ON_CHANGE basis as opposed to SAMPLE, and we don't have to explicitly state our
             desired behavior.
             ON_CHANGE only streams updates when changes occur.
-            SAMPLE will stream the subscription at a regular cadence/interval. 
+            SAMPLE will stream the subscription at a regular cadence/interval.
             [TARGET_DEFINED, ON_CHANGE, SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
             A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data

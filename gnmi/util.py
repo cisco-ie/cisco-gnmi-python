@@ -21,6 +21,19 @@ License for the specific language governing permissions and limitations under
 the License.
 """
 
+import logging
+
+try:
+    # Python 3
+    from urllib.parse import urlparse
+except ImportError:
+    # Python 2
+    from urlparse import urlparse
+
+import grpc
+from . import proto
+
+
 def gen_target(target, netloc_prefix="//", default_port=50051):
     """Parses and validates a supplied target URL for gRPC calls.
     Uses urllib to parse the netloc property from the URL.
@@ -39,8 +52,9 @@ def gen_target(target, netloc_prefix="//", default_port=50051):
     if parsed_target.port is None:
         ported_target = "%s:%i" % (parsed_target.hostname, default_port)
         logging.debug("No target port detected, reassembled to %s.", ported_target)
-        target_netloc = Client.__gen_target(ported_target)
+        target_netloc = gen_target(ported_target)
     return target_netloc
+
 
 def gen_client(target, credentials=None, options=None, tls_enabled=True):
     """Instantiates and returns the gNMI gRPC client stub over
@@ -59,6 +73,7 @@ def gen_client(target, credentials=None, options=None, tls_enabled=True):
         client = proto.gnmi_pb2_grpc.gNMIStub(secure_channel)
     return client
 
+
 def gen_credentials(credentials, credentials_from_file):
     """Generate credentials either by reading credentials from
     the specified file or return the original creds specified.
@@ -70,6 +85,7 @@ def gen_credentials(credentials, credentials_from_file):
             credentials = creds_fd.read()
     return credentials
 
+
 def gen_options(tls_server_override):
     """Generate options tuple for gRPC overrides, etc.
     Only TLS server is handled currently.
@@ -79,19 +95,23 @@ def gen_options(tls_server_override):
         options.append(("grpc.ssl_target_name_override", tls_server_override))
     return tuple(options)
 
+
 def parse_xpath_to_gnmi_path(xpath, origin=None):
+    """Parses an XPath to proto.gnmi_pb2.Path."""
     if not isinstance(xpath, str):
         raise Exception("xpath must be a string!")
     path = proto.gnmi_pb2.Path()
     if origin:
         if not isinstance(origin, str):
-            raise Exception('origin must be a string!')
+            raise Exception("origin must be a string!")
         path.origin = origin
     for element in xpath.split("/"):
         path.elem.append(proto.gnmi_pb2.PathElem(name=element))
     return path
 
+
 def validate_proto_enum(value_name, value, enum_name, enum):
+    """Helper function to validate an enum against the proto enum wrapper."""
     enum_value = None
     if value not in enum.keys() and value not in enum.values():
         raise Exception(
