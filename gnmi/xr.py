@@ -30,6 +30,8 @@ from .client import Client, proto, util
 
 
 class XRClient(Client):
+    """IOS XR-specific wrapper for gNMI functionality."""
+
     def set_json(
         self,
         update_json_configs=None,
