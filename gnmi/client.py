@@ -227,13 +227,13 @@ class Client(object):
         ----------
         prefix : proto.gnmi_pb2.Path, optional
             The Path to prefix all other Paths defined within other messages
-        update : iterable of proto.gnmi_pb2.Update, optional
+        updates : iterable of iterable of proto.gnmi_pb2.Update, optional
             The Updates to update configuration with.
-        replace : proto.gnmi_pb2.Update, optional
+        replaces : iterable of proto.gnmi_pb2.Update, optional
             The Updates which replaces other configuration.
             The main difference between replace and update is replace will remove non-referenced nodes.
-        delete : proto.gnmi_pb2.Update, optional
-            The Updates which refers to elements for deletion.
+        deletes : iterable of proto.gnmi_pb2.Path, optional
+            The Paths which refers to elements for deletion.
         extensions : iterable of proto.gnmi_ext.Extension, optional
 
         Returns
@@ -258,8 +258,8 @@ class Client(object):
             for update in replaces:
                 request.replace.append(update)
         if deletes:
-            for update in deletes:
-                request.delete.append(update)
+            for path in deletes:
+                request.delete.append(path)
         if extensions:
             for extension in extensions:
                 request.extension.append(extension)

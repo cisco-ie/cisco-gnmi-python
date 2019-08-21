@@ -50,7 +50,7 @@ class XRClient(Client):
         """
         if isinstance(xpaths, str):
             xpaths = [xpaths]
-        updates = []
+        paths = []
         for xpath in xpaths:
             if prefix:
                 if prefix.endswith("/") and xpath.startswith("/"):
@@ -61,10 +61,8 @@ class XRClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            updates.append(
-                proto.gnmi_pb2.Update(path=util.parse_xpath_to_gnmi_path(xpath))
-            )
-        return self.set(deletes=updates)
+            paths.append(util.parse_xpath_to_gnmi_path(xpath))
+        return self.set(deletes=paths)
 
     def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
