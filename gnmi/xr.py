@@ -32,13 +32,41 @@ from .client import Client, proto, util
 class XRClient(Client):
     """IOS XR-specific wrapper for gNMI functionality."""
 
-    def set_json(
-        self,
-        update_json_configs=None,
-        replace_json_configs=None,
-        delete_json_configs=None,
-        ietf=True,
-    ):
+    def delete_xpaths(self, xpaths, prefix=None):
+        """A convenience wrapper for set() which constructs Paths from supplied xpaths
+        to be passed to set() as the delete parameter.
+
+        Parameters
+        ----------
+        xpaths : iterable of str
+            XPaths to specify to be deleted.
+            If prefix is specified these strings are assumed to be the suffixes.
+        prefix : str
+            The XPath prefix to apply to all XPaths for deletion.
+
+        Returns
+        -------
+        set()
+        """
+        if isinstance(xpaths, str):
+            xpaths = [xpaths]
+        updates = []
+        for xpath in xpaths:
+            if prefix:
+                if prefix.endswith("/") and xpath.startswith("/"):
+                    xpath = "{prefix}{xpath}".format(
+                        prefix=prefix[:-1], xpath=xpath[1:]
+                    )
+                elif prefix.endswith("/") or xpath.startswith("/"):
+                    xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
+                else:
+                    xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
+            updates.append(
+                proto.gnmi_pb2.Update(path=util.parse_xpath_to_gnmi_path(xpath))
+            )
+        return self.set(deletes=updates)
+
+    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -51,8 +79,6 @@ class XRClient(Client):
             JSON configs to apply as updates.
         replace_json_configs : iterable of JSON configurations, optional
             JSON configs to apply as replacements.
-        delete_json_configs : iterable of JSON configurations, optional
-            JSON configs to apply as deletions.
         ietf : bool, optional
             Use JSON_IETF vs JSON.
 
@@ -60,7 +86,7 @@ class XRClient(Client):
         -------
         set()
         """
-        if not any([update_json_configs, replace_json_configs, delete_json_configs]):
+        if not any([update_json_configs, replace_json_configs]):
             raise Exception("Must supply at least one set of configurations to method!")
 
         def check_configs(name, configs):
@@ -118,8 +144,7 @@ class XRClient(Client):
 
         updates = create_updates("update_json_configs", update_json_configs)
         replaces = create_updates("replace_json_configs", replace_json_configs)
-        deletes = create_updates("delete_json_configs", delete_json_configs)
-        return self.set(updates=updates, replaces=replaces, deletes=deletes)
+        return self.set(updates=updates, replaces=replaces)
 
     def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.

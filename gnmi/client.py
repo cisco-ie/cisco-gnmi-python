@@ -259,7 +259,7 @@ class Client(object):
                 request.replace.append(update)
         if deletes:
             for update in deletes:
-                request.deletes.append(update)
+                request.delete.append(update)
         if extensions:
             for extension in extensions:
                 request.extension.append(extension)

@@ -20,7 +20,7 @@ It is *highly* recommended that users of the library learn [Google Protocol Buff
 Methods are documented in [`gnmi/client.py`](gnmi/client.py).
 
 ### XRClient
-`XRClient` inherets from `Client` and provides several wrapper methods which aid with IOS XR-specific behaviors of the gNMI implementation. These are `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods make several assumptions about what kind of information will be supplied to them in order to simplify usage of the gNMI RPCs.
+`XRClient` inherets from `Client` and provides several wrapper methods which aid with IOS XR-specific behaviors of the gNMI implementation. These are `delete_xpaths`, `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods make several assumptions about what kind of information will be supplied to them in order to simplify usage of the gNMI RPCs.
 
 Methods are documented in [`gnmi/xr.py`](gnmi/xr.py).
 
