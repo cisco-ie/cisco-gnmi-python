@@ -25,3 +25,4 @@ the License.
 
 
 from .client import Client
+from .xr import XRClient
