@@ -48,33 +48,17 @@ class Client(object):
         Retrieve meta information about version, supported models, etc.
     get(...)
         Get a snapshot of config, state, operational, or all forms of data.
-    get_xpaths(...)
-        Convenience wrapper for get() which helps construct get requests for specified xpaths.
     set(...)
         Update, replace, or delete configuration.
-    set_json(...)
-        Convenience wrapper for set() which assumes model-based JSON payloads.
     subscribe(...)
         Stream snapshots of data from the device.
-    subscribe_xpaths(...)
-        Convenience wrapper for subscribe() which helps construct subscriptions for specified xpaths.
 
     Examples
     --------
     >>> from gnmi import Client
-    >>> client = Client('127.0.0.1:57400', 'demo', 'demo', credentials='ems.pem', tls_server_override='ems.cisco.com', credentials_from_file=True)
+    >>> client = Client('127.0.0.1:57400', 'demo', 'demo')
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
-    ...
-    >>> get_response = client.get_xpaths('interfaces/interface')
-    >>> print(get_response)
-    ...
-    >>> subscribe_response = client.subscribe_xpaths('interfaces/interface')
-    >>> for message in subscribe_response: print(message)
-    ...
-    >>> config = '{"Cisco-IOS-XR-infra-infra-cfg:banners":{"banner": [{"banner-name": "motd", "banner-text": "Hello gNMI!" }]}}'
-    >>> set_response = client.set_json(config)
-    >>> print(set_response)
     ...
     """
 

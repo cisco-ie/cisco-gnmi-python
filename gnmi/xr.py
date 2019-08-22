@@ -30,7 +30,47 @@ from .client import Client, proto, util
 
 
 class XRClient(Client):
-    """IOS XR-specific wrapper for gNMI functionality."""
+    """IOS XR-specific wrapper for gNMI functionality.
+
+    Returns direct responses from base Client methods.
+
+    Attributes
+    ----------
+    username : str
+    password : str
+    timeout : uint
+    tls_enabled : bool
+
+    Methods
+    -------
+    delete_xpaths(...)
+        Convenience wrapper for set() which constructs Paths from XPaths for deletion.
+    get_xpaths(...)
+        Convenience wrapper for get() which helps construct get requests for specified xpaths.
+    set_json(...)
+        Convenience wrapper for set() which assumes model-based JSON payloads.
+    subscribe_xpaths(...)
+        Convenience wrapper for subscribe() which helps construct subscriptions for specified xpaths.
+
+    Examples
+    --------
+    >>> from gnmi import XRClient
+    >>> client = XRClient('127.0.0.1:57400', 'demo', 'demo', credentials='ems.pem', tls_server_override='ems.cisco.com', credentials_from_file=True)
+    >>> capabilities = client.capabilities()
+    >>> print(capabilities)
+    ...
+    >>> get_response = client.get_xpaths('interfaces/interface')
+    >>> print(get_response)
+    ...
+    >>> subscribe_response = client.subscribe_xpaths('interfaces/interface')
+    >>> for message in subscribe_response: print(message)
+    ...
+    >>> config = '{"Cisco-IOS-XR-shellutil-cfg:host-names": [{"host-name": "gnmi_test"}]}'
+    >>> set_response = client.set_json(config)
+    >>> print(set_response)
+    ...
+    >>> delete_response = client.delete_xpaths('Cisco-IOS-XR-shellutil-cfg:host-names/host-name')
+    """
 
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
