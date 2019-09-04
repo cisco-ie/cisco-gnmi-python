@@ -8,6 +8,9 @@ grpcio-tools = "*"
 googleapis-common-protos = "*"
 pylint = "*"
 black = "==19.3b0"
+twine = "*"
+setuptools = "*"
+wheel = "*"
 
 [packages]
 grpcio = "*"
