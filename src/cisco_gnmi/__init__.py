@@ -27,4 +27,4 @@ the License.
 from .client import Client
 from .xr import XRClient
 
-__version__ = '0.0.1'
+__version__ = "0.0.1"
