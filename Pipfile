@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[dev-packages]
+grpcio-tools = "*"
+googleapis-common-protos = "*"
+pylint = "*"
+black = "==19.3b0"
+twine = "*"
+setuptools = "*"
+wheel = "*"
+
+[packages]
+grpcio = "*"
+protobuf = "*"
+
+[requires]
+python_version = "3.6"
