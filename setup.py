@@ -15,7 +15,7 @@ with io.open("src/cisco_gnmi/__init__.py", "rt", encoding="utf8") as f:
     version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
 setup(
-    name="Cisco gNMI",
+    name="cisco_gnmi",
     version=version,
     url="https://github.com/cisco-ie/cisco-gnmi-python",
     project_urls={
@@ -29,6 +29,7 @@ setup(
     maintainer_email="cisco-ie@cisco.com",
     description="This library wraps gNMI functionality to ease usage with Cisco implementations.",
     long_description=readme,
+    long_description_content_type="text/markdown",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: System :: Networking",
