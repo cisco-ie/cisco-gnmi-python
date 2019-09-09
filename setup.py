@@ -52,13 +52,14 @@ setup(
     install_requires=[
         "grpcio",
         "protobuf",
+        "enum34",
+        "six",
     ],
     extras_require={
         "dev": [
             "grpcio-tools",
             "googleapis-common-protos",
             "pylint",
-            "black==19.3b0",
             "twine",
             "setuptools",
             "wheel",

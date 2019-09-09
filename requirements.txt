@@ -1,0 +1,6 @@
+-i https://pypi.org/simple
+enum34
+futures ; python_version < '3.2'
+grpcio
+protobuf
+six

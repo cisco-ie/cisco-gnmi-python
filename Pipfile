@@ -7,7 +7,6 @@ name = "pypi"
 grpcio-tools = "*"
 googleapis-common-protos = "*"
 pylint = "*"
-black = "==19.3b0"
 twine = "*"
 setuptools = "*"
 wheel = "*"
@@ -15,6 +14,8 @@ wheel = "*"
 [packages]
 grpcio = "*"
 protobuf = "*"
+enum34 = "*"
+six = "*"
 
 [requires]
 python_version = "3.6"
