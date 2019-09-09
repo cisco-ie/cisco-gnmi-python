@@ -30,7 +30,7 @@ except ImportError:
     # Python 2
     from urlparse import urlparse
 
-from future.utils import string_types
+from six import string_types
 import grpc
 from . import proto
 

@@ -26,7 +26,7 @@ the License.
 import json
 import logging
 
-from future.utils import string_types
+from six import string_types
 from .client import Client, proto, util
 
 
