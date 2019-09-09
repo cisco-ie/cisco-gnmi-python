@@ -26,6 +26,7 @@ the License.
 import json
 import logging
 
+from future.utils import string_types
 from .client import Client, proto, util
 
 
@@ -88,7 +89,7 @@ class XRClient(Client):
         -------
         set()
         """
-        if isinstance(xpaths, str):
+        if isinstance(xpaths, string_types):
             xpaths = [xpaths]
         paths = []
         for xpath in xpaths:
@@ -128,7 +129,7 @@ class XRClient(Client):
             raise Exception("Must supply at least one set of configurations to method!")
 
         def check_configs(name, configs):
-            if isinstance(name, str):
+            if isinstance(name, string_types):
                 logging.debug("Handling %s as JSON string.", name)
                 try:
                     configs = json.loads(configs)
@@ -204,7 +205,7 @@ class XRClient(Client):
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
             gnmi_path = map(util.parse_xpath_to_gnmi_path, set(xpaths))
-        elif isinstance(xpaths, str):
+        elif isinstance(xpaths, string_types):
             gnmi_path = [util.parse_xpath_to_gnmi_path(xpaths)]
         else:
             raise Exception(
@@ -279,11 +280,11 @@ class XRClient(Client):
         subscription_list.encoding = util.validate_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
-        if isinstance(xpath_subscriptions, str):
+        if isinstance(xpath_subscriptions, string_types):
             xpath_subscriptions = [xpath_subscriptions]
         for xpath_subscription in xpath_subscriptions:
             subscription = None
-            if isinstance(xpath_subscription, str):
+            if isinstance(xpath_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
                     util.parse_xpath_to_gnmi_path(xpath_subscription)

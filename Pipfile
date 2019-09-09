@@ -15,6 +15,7 @@ wheel = "*"
 [packages]
 grpcio = "*"
 protobuf = "*"
+future = "*"
 
 [requires]
 python_version = "3.6"

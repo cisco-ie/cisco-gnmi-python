@@ -30,6 +30,7 @@ except ImportError:
     # Python 2
     from urlparse import urlparse
 
+from future.utils import string_types
 import grpc
 from . import proto
 
@@ -98,11 +99,11 @@ def gen_options(tls_server_override):
 
 def parse_xpath_to_gnmi_path(xpath, origin=None):
     """Parses an XPath to proto.gnmi_pb2.Path."""
-    if not isinstance(xpath, str):
+    if not isinstance(xpath, string_types):
         raise Exception("xpath must be a string!")
     path = proto.gnmi_pb2.Path()
     if origin:
-        if not isinstance(origin, str):
+        if not isinstance(origin, string_types):
             raise Exception("origin must be a string!")
         path.origin = origin
     for element in xpath.split("/"):
