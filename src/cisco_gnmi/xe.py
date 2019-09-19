@@ -199,7 +199,7 @@ class XEClient(Client):
         replaces = create_updates("replace_json_configs", replace_json_configs)
         return self.set(updates=updates, replaces=replaces)
 
-    def get_xpaths(self, xpaths, data_type="ALL"):
+    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
 
         Parameters
@@ -232,6 +232,7 @@ class XEClient(Client):
         xpath_subscriptions,
         request_mode="STREAM",
         sub_mode="SAMPLE",
+        encoding="JSON_IETF",
         sample_interval=Client._NS_IN_S,
         suppress_redundant=False,
         heartbeat_interval=None,
@@ -266,6 +267,9 @@ class XEClient(Client):
             ON_CHANGE only streams updates when changes occur.
             SAMPLE will stream the subscription at a regular cadence/interval.
             [TARGET_DEFINED, ON_CHANGE, SAMPLE]
+        encoding : proto.gnmi_pb2.Encoding, optional
+            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
+            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
             Defaults to 5 seconds.
@@ -288,7 +292,7 @@ class XEClient(Client):
             proto.gnmi_pb2.SubscriptionList.Mode,
         )
         subscription_list.encoding = util.validate_proto_enum(
-            "encoding", "JSON_IETF", "Encoding", proto.gnmi_pb2.Encoding
+            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         if isinstance(xpath_subscriptions, string_types):
             xpath_subscriptions = [xpath_subscriptions]
@@ -337,7 +341,7 @@ class XEClient(Client):
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         if origin is None:
-            if "openconfig" in xpath or ":" not in xpath:
+            if xpath.startswith("openconfig") or ":" not in xpath:
                 origin = "openconfig"
             else:
                 origin = "rfc7951"

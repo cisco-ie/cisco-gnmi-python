@@ -334,8 +334,8 @@ class XRClient(Client):
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         if origin is None:
-            if "openconfig" in xpath or ":" not in xpath:
-                origin = "openconfig"
+            if xpath.startswith("openconfig") or ":" not in xpath:
+                origin = None # openconfig
             else:
-                origin = xpath.split(":")[0]
+                origin = xpath.split(":")[0] # module name
         return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
