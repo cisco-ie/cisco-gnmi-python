@@ -74,7 +74,7 @@ class Client(Base):
 
     def __init__(self, target, timeout=Base._C_MAX_LONG, attempt_implicit_secure=False):
         super(Client, self).__init__(target, timeout, proto.gnmi_pb2_grpc.gNMIStub)
-        if attempt_secure:
+        if attempt_implicit_secure:
             self.as_secure(root_from_target=True, target_name_from_root=True)
 
     def capabilities(self):
