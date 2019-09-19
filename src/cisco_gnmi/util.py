@@ -35,7 +35,7 @@ import grpc
 from . import proto
 
 
-def gen_target(target, netloc_prefix="//", default_port=50051):
+def gen_target_netloc(target, netloc_prefix="//", default_port=50051):
     """Parses and validates a supplied target URL for gRPC calls.
     Uses urllib to parse the netloc property from the URL.
     netloc property is, effectively, fqdn/hostname:port.
@@ -49,42 +49,12 @@ def gen_target(target, netloc_prefix="//", default_port=50051):
         raise ValueError("Unable to parse netloc from target URL %s!" % target)
     if parsed_target.scheme:
         logging.debug("Scheme identified in target, ignoring and using netloc.")
-    target_netloc = parsed_target.netloc
+    target_netloc = parsed_target
     if parsed_target.port is None:
         ported_target = "%s:%i" % (parsed_target.hostname, default_port)
         logging.debug("No target port detected, reassembled to %s.", ported_target)
-        target_netloc = gen_target(ported_target)
+        target_netloc = gen_target_netloc(ported_target)
     return target_netloc
-
-
-def gen_client(target, credentials=None, options=None, tls_enabled=True):
-    """Instantiates and returns the gNMI gRPC client stub over
-    an insecure or secure channel.
-    """
-    client = None
-    if not tls_enabled:
-        logging.warning(
-            "TLS MUST be enabled per gNMI specification. If your gNMI implementation works without TLS, it is non-compliant."
-        )
-        insecure_channel = grpc.insecure_channel(target)
-        client = proto.gnmi_pb2_grpc.gNMIStub(insecure_channel)
-    else:
-        channel_creds = grpc.ssl_channel_credentials(credentials)
-        secure_channel = grpc.secure_channel(target, channel_creds, options)
-        client = proto.gnmi_pb2_grpc.gNMIStub(secure_channel)
-    return client
-
-
-def gen_credentials(credentials, credentials_from_file):
-    """Generate credentials either by reading credentials from
-    the specified file or return the original creds specified.
-    """
-    if not credentials:
-        return None
-    if credentials_from_file:
-        with open(credentials, "rb") as creds_fd:
-            credentials = creds_fd.read()
-    return credentials
 
 
 def gen_options(tls_server_override):
