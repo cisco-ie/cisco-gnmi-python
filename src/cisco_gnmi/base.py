@@ -19,7 +19,7 @@ class Base(object):
 
     _NS_IN_S = int(1e9)
 
-    def __init__(self, target, timeout=_C_MAX_LONG):
+    def __init__(self, target, timeout=_C_MAX_LONG, service_class=None):
         self.target_netloc = gen_target_netloc(target)
         self.timeout = timeout
         self.username = None
@@ -27,7 +27,7 @@ class Base(object):
         self.channel_creds = None
         self.channel_options = None
         self.channel = None
-        self.service_class = None
+        self.service_class = service_class
         self.service = None
 
     def with_authentication(self, username, password):

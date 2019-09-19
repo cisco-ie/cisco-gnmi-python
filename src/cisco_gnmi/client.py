@@ -57,26 +57,25 @@ class Client(Base):
     >>> from cisco_gnmi import Client
     >>> client = Client(
     ...   '127.0.0.1:57400'
-    ... ).with_authentication(
-    ...   'admin',
-    ...   'what_is_infosec'
     ... ).as_secure(
     ...   root_from_target=True,
     ...   target_name_from_root=True
+    ... ).with_authentication(
+    ...   'admin',
+    ...   'what_is_infosec'
     ... )
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...
     """
 
-    def __init__(self, target, timeout=Base._C_MAX_LONG):
-        super(Client, self).__init__(target, timeout)
-        self.as_secure(
-            root_from_target=True,
-            target_name_from_root=True
-        ).apply_service(
-            proto.gnmi_pb2_grpc.gNMIStub
-        )
+    def __init__(self, target, timeout=Base._C_MAX_LONG, attempt_secure=False):
+        super(Client, self).__init__(target, timeout, proto.gnmi_pb2_grpc.gNMIStub)
+        if attempt_secure:
+            self.as_secure(
+                root_from_target=True,
+                target_name_from_root=True
+            )
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
