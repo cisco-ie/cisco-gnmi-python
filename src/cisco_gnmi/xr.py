@@ -56,7 +56,14 @@ class XRClient(Client):
     Examples
     --------
     >>> from gnmi import XRClient
-    >>> client = XRClient('127.0.0.1:57400', 'demo', 'demo', credentials='ems.pem', tls_server_override='ems.cisco.com', credentials_from_file=True)
+    >>> client = XEClient('127.0.0.1:57400').as_secure(
+    ...     root_certificates='ems.pem',
+    ...     channel_options=('grpc.ssl_target_name_override', 'ems.cisco.com'),
+    ...     from_file=True
+    ... ).with_authentication(
+    ...     'admin',
+    ...     'its_a_secret'   
+    ... )
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...

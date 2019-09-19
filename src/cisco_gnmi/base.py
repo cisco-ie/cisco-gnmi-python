@@ -20,6 +20,13 @@ class Base(object):
     _NS_IN_S = int(1e9)
 
     def __init__(self, target, timeout=_C_MAX_LONG, service_class=None):
+        """gRPC initialization wrapper which chains aspects of initialization
+        such as channel security, authentication, etc.
+        This class isn't necessarily meant to be directly used but may be useful
+        if attempting to use multiple gRPC stubs and desiring this kind of construction
+        flow.
+        Currently assumes a single service_class, does not handle multiple stubs.
+        """
         self.target_netloc = gen_target_netloc(target)
         self.timeout = timeout
         self.username = None

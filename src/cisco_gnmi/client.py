@@ -65,14 +65,14 @@ class Client(Base):
     ...   target_name_from_root=True
     ... ).with_authentication(
     ...   'admin',
-    ...   'what_is_infosec'
+    ...   'its_a_secret'
     ... )
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...
     """
 
-    def __init__(self, target, timeout=Base._C_MAX_LONG, attempt_secure=False):
+    def __init__(self, target, timeout=Base._C_MAX_LONG, attempt_implicit_secure=False):
         super(Client, self).__init__(target, timeout, proto.gnmi_pb2_grpc.gNMIStub)
         if attempt_secure:
             self.as_secure(root_from_target=True, target_name_from_root=True)

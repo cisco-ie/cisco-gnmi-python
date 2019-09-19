@@ -67,7 +67,15 @@ class XEClient(Client):
     Examples
     --------
     >>> from gnmi import XEClient
-    >>> client = XEClient('127.0.0.1:57400', 'demo', 'demo', credentials='ems.pem', tls_server_override='ems.cisco.com', credentials_from_file=True)
+    >>> client = XEClient('127.0.0.1:57400').as_secure(
+    ...     root_certificates='rootCA.pem',
+    ...     private_key='client.key',
+    ...     certificate_chain='client.crt',
+    ...     from_file=True
+    ... ).with_authentication(
+    ...     'admin',
+    ...     'its_a_secret'   
+    ... )
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...
