@@ -3,7 +3,8 @@ import logging
 import json
 
 import grpc
-import cryptography
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 from .util import gen_target_netloc
 
 
@@ -74,11 +75,11 @@ class Base(object):
 
         def get_cn_from_cert(cert_pem):
             cert_cn = None
-            cert_parsed = cryptography.x509.load_pem_x509_certificate(
-                cert_pem, cryptography.hazmat.backends.default_backend()
+            cert_parsed = x509.load_pem_x509_certificate(
+                cert_pem, default_backend()
             )
             cert_cns = cert_parsed.subject.get_attributes_for_oid(
-                cryptography.x509.oid.NameOID.COMMON_NAME
+                x509.oid.NameOID.COMMON_NAME
             )
             if len(cert_cns):
                 if len(cert_cns) > 1:
