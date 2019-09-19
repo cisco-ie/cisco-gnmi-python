@@ -101,10 +101,11 @@ class Base(object):
         certificate_chain = (
             get_cert_content(certificate_chain) if from_file else certificate_chain
         )
-        if root_certificates and root_from_target:
-            logging.warning(
-                "Root certificates specified, not discovering root from target."
-            )
+        if root_certificates:
+            if root_from_target:
+                logging.warning(
+                    "Root certificates specified, not discovering root from target."
+                )
             root_certificates = (
                 get_cert_content(root_certificates) if from_file else root_certificates
             )
