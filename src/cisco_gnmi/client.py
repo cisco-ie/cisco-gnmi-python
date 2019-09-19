@@ -23,6 +23,7 @@ the License.
 
 """Python gNMI wrapper to ease usage of gNMI."""
 
+from xml.etree.ElementPath import xpath_tokenizer_re
 from six import string_types
 
 from .base import Base
@@ -247,6 +248,54 @@ class Client(Base):
             if not isinstance(origin, string_types):
                 raise Exception("origin must be a string!")
             path.origin = origin
-        for element in xpath.split("/"):
-            path.elem.append(proto.gnmi_pb2.PathElem(name=element))
+        curr_elem = proto.gnmi_pb2.PathElem()
+        in_filter = False
+        just_filtered = False
+        curr_key = None
+        xpath_elements = xpath_tokenizer_re.findall(xpath)
+        for index, element in enumerate(xpath_elements):
+            if element[0] == "/":
+                if not curr_elem.name:
+                    raise Exception(
+                        "Current PathElem has no name yet is trying to be pushed to path! Invalid XPath?"
+                    )
+                path.elem.append(curr_elem)
+                curr_elem = proto.gnmi_pb2.PathElem()
+                continue
+            elif element[0] == "[":
+                in_filter = True
+                continue
+            elif element[0] == "]":
+                in_filter = False
+                continue
+            else:
+                if not in_filter:
+                    curr_elem.name = element[1]
+                else:
+                    if not any([element[0], element[1]]):
+                        continue
+                    elif just_filtered and element[1] == "and":
+                        just_filtered = False
+                        continue
+                    elif curr_key is None:
+                        curr_key = element[1]
+                        continue
+                    elif curr_key is not None:
+                        if element[0] in [">", "<"]:
+                            raise Exception("Only = supported as filter operand!")
+                        if element[0] == "=":
+                            continue
+                        else:
+                            if curr_key in curr_elem.key.keys():
+                                raise Exception("Key already in key map!")
+                            curr_elem.key[curr_key] = element[0].strip("'\"")
+                            curr_key = None
+                            just_filtered = True
+        if curr_key:
+            raise Exception("Hanging key filter! Incomplete XPath?")
+        if curr_elem:
+            path.elem.append(curr_elem)
+            curr_elem = None
+        if any([curr_elem, curr_key, in_filter]):
+            raise Exception("Unfinished elements in XPath parsing!")
         return path
