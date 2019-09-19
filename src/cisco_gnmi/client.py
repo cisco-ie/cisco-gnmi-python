@@ -69,6 +69,15 @@ class Client(Base):
     ...
     """
 
+    def __init__(self, target, timeout=Base._C_MAX_LONG):
+        super(Client, self).__init__(target, timeout)
+        self.as_secure(
+            root_from_target=True,
+            target_name_from_root=True
+        ).apply_service(
+            proto.gnmi_pb2_grpc.gNMIStub
+        )
+
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
         is supported by the target. This allows the target to validate the
