@@ -109,7 +109,7 @@ class XRClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            paths.append(util.parse_xpath_to_gnmi_path(xpath))
+            paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
     def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
@@ -180,7 +180,7 @@ class XRClient(Client):
                 element = top_element_split[1]
                 config = config.pop(top_element)
                 update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(util.parse_xpath_to_gnmi_path(element, origin))
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(element, origin))
                 if ietf:
                     update.val.json_ietf_val = json.dumps(config).encode("utf-8")
                 else:
@@ -211,9 +211,9 @@ class XRClient(Client):
         """
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = map(util.parse_xpath_to_gnmi_path, set(xpaths))
+            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [util.parse_xpath_to_gnmi_path(xpaths)]
+            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
@@ -294,7 +294,7 @@ class XRClient(Client):
             if isinstance(xpath_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
-                    util.parse_xpath_to_gnmi_path(xpath_subscription)
+                    self.parse_xpath_to_gnmi_path(xpath_subscription)
                 )
                 subscription.mode = util.validate_proto_enum(
                     "sub_mode",
@@ -307,7 +307,7 @@ class XRClient(Client):
                 if heartbeat_interval:
                     subscription.heartbeat_interval = heartbeat_interval
             elif isinstance(xpath_subscription, dict):
-                path = util.parse_xpath_to_gnmi_path(xpath_subscription["path"])
+                path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
                 arg_dict = {
                     "path": path,
                     "mode": sub_mode,
