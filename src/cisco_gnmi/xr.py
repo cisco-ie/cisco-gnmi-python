@@ -324,3 +324,11 @@ class XRClient(Client):
                 raise Exception("xpath in list must be xpath or dict/Path!")
             subscription_list.subscription.append(subscription)
         return self.subscribe([subscription_list])
+
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        if origin is None:
+            if "openconfig" in xpath or ":" not in xpath:
+                origin = "openconfig"
+            else:
+                origin = xpath.split(":")[0]
+        return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)

@@ -23,6 +23,8 @@ the License.
 
 """Python gNMI wrapper to ease usage of gNMI."""
 
+from six import string_types
+
 from .base import Base
 from . import proto
 from . import util
@@ -72,10 +74,7 @@ class Client(Base):
     def __init__(self, target, timeout=Base._C_MAX_LONG, attempt_secure=False):
         super(Client, self).__init__(target, timeout, proto.gnmi_pb2_grpc.gNMIStub)
         if attempt_secure:
-            self.as_secure(
-                root_from_target=True,
-                target_name_from_root=True
-            )
+            self.as_secure(root_from_target=True, target_name_from_root=True)
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
@@ -238,3 +237,16 @@ class Client(Base):
             metadata=self._gen_metadata(),
         )
         return response_stream
+
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """Parses an XPath to proto.gnmi_pb2.Path."""
+        if not isinstance(xpath, string_types):
+            raise Exception("xpath must be a string!")
+        path = proto.gnmi_pb2.Path()
+        if origin:
+            if not isinstance(origin, string_types):
+                raise Exception("origin must be a string!")
+            path.origin = origin
+        for element in xpath.split("/"):
+            path.elem.append(proto.gnmi_pb2.PathElem(name=element))
+        return path

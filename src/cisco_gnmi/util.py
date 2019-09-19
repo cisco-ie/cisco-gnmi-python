@@ -57,30 +57,6 @@ def gen_target_netloc(target, netloc_prefix="//", default_port=50051):
     return target_netloc
 
 
-def gen_options(tls_server_override):
-    """Generate options tuple for gRPC overrides, etc.
-    Only TLS server is handled currently.
-    """
-    options = []
-    if tls_server_override:
-        options.append(("grpc.ssl_target_name_override", tls_server_override))
-    return tuple(options)
-
-
-def parse_xpath_to_gnmi_path(xpath, origin=None):
-    """Parses an XPath to proto.gnmi_pb2.Path."""
-    if not isinstance(xpath, string_types):
-        raise Exception("xpath must be a string!")
-    path = proto.gnmi_pb2.Path()
-    if origin:
-        if not isinstance(origin, string_types):
-            raise Exception("origin must be a string!")
-        path.origin = origin
-    for element in xpath.split("/"):
-        path.elem.append(proto.gnmi_pb2.PathElem(name=element))
-    return path
-
-
 def validate_proto_enum(value_name, value, enum_name, enum):
     """Helper function to validate an enum against the proto enum wrapper."""
     enum_value = None
