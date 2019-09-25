@@ -111,29 +111,29 @@ class Base(object):
             )
         elif root_from_target:
             root_certificates = get_cert_from_target(self.target_netloc)
-            if target_name_from_root:
+        if target_name_from_root:
+            logging.warning(
+                "Overriding SSL target name, this is effectively insecure."
+            )
+            cert_cn = get_cn_from_cert(root_certificates)
+            server_option = ("grpc.ssl_target_name_override", cert_cn)
+            if not cert_cn:
+                logging.warning("No CN found, not altering channel options.")
+            if self.channel_options:
                 logging.warning(
-                    "Overriding SSL target name, this is effectively insecure."
+                    "Modifying passed channel options to override server name from root certificate."
                 )
-                cert_cn = get_cn_from_cert(root_certificates)
-                server_option = ("grpc.ssl_target_name_override", cert_cn)
-                if not cert_cn:
-                    logging.warning("No CN found, not altering channel options.")
-                if self.channel_options:
-                    logging.warning(
-                        "Modifying passed channel options to override server name from root certificate."
-                    )
-                    found_index = None
-                    for index, option in enumerate(self.channel_options):
-                        if option[0] == "grpc.ssl_target_name_override":
-                            found_index = index
-                            break
-                    if found_index is not None:
-                        self.channel_options[found_index] = server_option
-                    else:
-                        self.channel_options.append(server_option)
+                found_index = None
+                for index, option in enumerate(self.channel_options):
+                    if option[0] == "grpc.ssl_target_name_override":
+                        found_index = index
+                        break
+                if found_index is not None:
+                    self.channel_options[found_index] = server_option
                 else:
-                    self.channel_options = [server_option]
+                    self.channel_options.append(server_option)
+            else:
+                self.channel_options = [server_option]
         self.channel_creds = grpc.ssl_channel_credentials(
             root_certificates, private_key, certificate_chain
         )
