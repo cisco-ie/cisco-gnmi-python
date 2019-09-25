@@ -55,8 +55,8 @@ class XRClient(Client):
 
     Examples
     --------
-    >>> from gnmi import XRClient
-    >>> client = XEClient('127.0.0.1:57400').as_secure(
+    >>> from cisco_gnmi import XRClient
+    >>> client = XRClient('127.0.0.1:9339').as_secure(
     ...     root_certificates='ems.pem',
     ...     channel_options=('grpc.ssl_target_name_override', 'ems.cisco.com'),
     ...     from_file=True
@@ -333,9 +333,15 @@ class XRClient(Client):
         return self.subscribe([subscription_list])
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """No origin specified implies openconfig
+        Otherwise origin is expected to be the module name
+        """
         if origin is None:
+            # naive but effective
             if xpath.startswith("openconfig") or ":" not in xpath:
-                origin = None # openconfig
+                # openconfig
+                origin = None
             else:
-                origin = xpath.split(":")[0] # module name
+                # module name
+                origin = xpath.split(":")[0]
         return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)

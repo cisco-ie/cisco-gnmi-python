@@ -35,11 +35,12 @@ import grpc
 from . import proto
 
 
-def gen_target_netloc(target, netloc_prefix="//", default_port=50051):
+def gen_target_netloc(target, netloc_prefix="//", default_port=9339):
     """Parses and validates a supplied target URL for gRPC calls.
     Uses urllib to parse the netloc property from the URL.
     netloc property is, effectively, fqdn/hostname:port.
     This provides some level of URL validation and flexibility.
+    9339 is IANA reserved port for gNMI/gNOI/...
     Returns netloc property of target.
     """
     if netloc_prefix not in target:
