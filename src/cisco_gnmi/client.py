@@ -37,13 +37,6 @@ class Client(Base):
     Returns relatively raw response data. Response data may be accessed according
     to the gNMI specification.
 
-    Attributes
-    ----------
-    username : str
-    password : str
-    timeout : uint
-    tls_enabled : bool
-
     Methods
     -------
     capabilities()

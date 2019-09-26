@@ -35,13 +35,6 @@ class XRClient(Client):
 
     Returns direct responses from base Client methods.
 
-    Attributes
-    ----------
-    username : str
-    password : str
-    timeout : uint
-    tls_enabled : bool
-
     Methods
     -------
     delete_xpaths(...)
@@ -202,8 +195,10 @@ class XRClient(Client):
             If simply a str, wraps as a list for convenience
         data_type : proto.gnmi_pb2.GetRequest.DataType, optional
             A direct value or key from the GetRequest.DataType enum
+            [ALL, CONFIG, STATE, OPERATIONAL]
         encoding : proto.gnmi_pb2.GetRequest.Encoding, optional
             A direct value or key from the Encoding enum
+            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
 
         Returns
         -------

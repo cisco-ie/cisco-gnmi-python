@@ -9,6 +9,31 @@ from .util import gen_target_netloc
 
 
 class Base(object):
+    """gRPC wrapper to ease setup of gRPC services.
+    Fundamental class, not expected to be initialized outside of library.
+
+    Attributes
+    ----------
+    target_netloc : netloc
+    timeout : uint
+    username : str
+    password : str
+    channel_creds : grpc.ChannelCredentials
+    channel : grpc.Channel
+    service_class : Object
+    service : Object
+
+    Methods
+    -------
+    with_authentication(...)
+        Specifies authentication credentials (username and password).
+    as_secure(...)
+        Sets up a secure channel.
+    as_insecure(...)
+        Sets up an insecure channel.
+    apply_service(...)
+        Initializes a gRPC stub around a channel.
+    """
 
     """Defining property due to gRPC timeout being based on a C long type.
     Should really define this based on architecture.
