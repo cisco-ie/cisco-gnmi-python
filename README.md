@@ -39,7 +39,7 @@ __init__(
 * `timeout` is the amount of time in seconds to await before timing out per RPC.
 * `attempt_implicit_secure` indicates whether to attempt to immediately connect to the network element, acquire whatever certificate is available, and set up an encrypted channel utilizing the retrieved certificate. This is still insecure, but encrypted and useful for testing TLS functionality.
 
-```
+```python
 as_secure(
     self,
     root_certificates=None,
@@ -108,6 +108,7 @@ client = Client(
 
 
 Using an owned root certificate on the filesystem:
+
 ```python
 from cisco_gnmi import Client
 
