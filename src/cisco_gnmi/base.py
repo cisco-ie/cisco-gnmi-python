@@ -137,9 +137,7 @@ class Base(object):
         elif root_from_target:
             root_certificates = get_cert_from_target(self.target_netloc)
         if target_name_from_root:
-            logging.warning(
-                "Overriding SSL target name, this is effectively insecure."
-            )
+            logging.warning("Overriding SSL target name, this is effectively insecure.")
             cert_cn = get_cn_from_cert(root_certificates)
             server_option = ("grpc.ssl_target_name_override", cert_cn)
             if not cert_cn:
