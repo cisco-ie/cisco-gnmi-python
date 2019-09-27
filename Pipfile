@@ -14,10 +14,8 @@ wheel = "*"
 [packages]
 grpcio = "*"
 protobuf = "*"
-enum34 = "*"
 six = "*"
 cryptography = "*"
-py2-ipaddress = "*"
 
 [requires]
 python_version = "3.6"
