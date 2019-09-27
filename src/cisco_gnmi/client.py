@@ -286,41 +286,42 @@ class Client(Base):
                 curr_elem = proto.gnmi_pb2.PathElem()
                 continue
             # We are entering a filter
-            if element[0] == "[":
+            elif element[0] == "[":
                 in_filter = True
                 continue
             # We are exiting a filter
-            if element[0] == "]":
+            elif element[0] == "]":
                 in_filter = False
                 continue
             # If we're not in a filter then we're a PathElem name
-            if not in_filter:
+            elif not in_filter:
                 curr_elem.name = element[1]
             # Skip blank spaces
             elif not any([element[0], element[1]]):
                 continue
             # If we're in the filter and just completed a filter expr,
             # "and" as a junction should just be ignored.
-            if in_filter and just_filtered and element[1] == "and":
+            elif in_filter and just_filtered and element[1] == "and":
                 just_filtered = False
                 continue
             # Otherwise we're in a filter and this term is a key name
-            if curr_key is None:
+            elif curr_key is None:
                 curr_key = element[1]
                 continue
             # Otherwise we're an operator or the key value
-            if curr_key is not None:
+            elif curr_key is not None:
                 # I think = is the only possible thing to support with PathElem syntax as is
                 if element[0] in [">", "<"]:
                     raise Exception("Only = supported as filter operand!")
                 if element[0] == "=":
                     continue
-                # We have a full key here, put it in the map
-                if curr_key in curr_elem.key.keys():
-                    raise Exception("Key already in key map!")
-                curr_elem.key[curr_key] = element[0].strip("'\"")
-                curr_key = None
-                just_filtered = True
+                else:
+                    # We have a full key here, put it in the map
+                    if curr_key in curr_elem.key.keys():
+                        raise Exception("Key already in key map!")
+                    curr_elem.key[curr_key] = element[0].strip("'\"")
+                    curr_key = None
+                    just_filtered = True
         # Keys/filters in general should be totally cleaned up at this point.
         if curr_key:
             raise Exception("Hanging key filter! Incomplete XPath?")

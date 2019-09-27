@@ -30,6 +30,10 @@ except ImportError:
     # Python 2
     from urlparse import urlparse
 
+from six import string_types
+import grpc
+from . import proto
+
 
 def gen_target_netloc(target, netloc_prefix="//", default_port=9339):
     """Parses and validates a supplied target URL for gRPC calls.

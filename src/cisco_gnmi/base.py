@@ -100,9 +100,9 @@ class Base(object):
                 cert_content = cert_fd.read()
             return cert_content
 
-        def get_cert_from_target(target_netloc):
+        def get_cert_from_target(target):
             return ssl.get_server_certificate(
-                (target_netloc.hostname, target_netloc.port)
+                (self.target_netloc.hostname, self.target_netloc.port)
             ).encode("utf-8")
 
         def get_cn_from_cert(cert_pem):
@@ -111,7 +111,7 @@ class Base(object):
             cert_cns = cert_parsed.subject.get_attributes_for_oid(
                 x509.oid.NameOID.COMMON_NAME
             )
-            if len(cert_cns) > 0:
+            if len(cert_cns):
                 if len(cert_cns) > 1:
                     logging.warning(
                         "Multiple CNs found for certificate, defaulting to the first one."
