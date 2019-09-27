@@ -23,6 +23,7 @@ the License.
 
 """Python gNMI wrapper to ease usage of gNMI."""
 
+import logging
 from xml.etree.ElementPath import xpath_tokenizer_re
 from six import string_types
 
@@ -89,7 +90,7 @@ class Client(Base):
         logging.warning(
             "TLS MUST be enabled per gNMI specification. If utilizing the gNMI implementation without TLS, it is non-compliant."
         )
-        super(Client, self).as_insecure(channel_options, compression)
+        return super(Client, self).as_insecure(channel_options, compression)
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
