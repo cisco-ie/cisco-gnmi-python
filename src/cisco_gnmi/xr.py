@@ -55,7 +55,7 @@ class XRClient(Client):
     ...     from_file=True
     ... ).with_authentication(
     ...     'admin',
-    ...     'its_a_secret'   
+    ...     'its_a_secret'
     ... )
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
@@ -163,7 +163,7 @@ class XRClient(Client):
                             top_element
                         )
                     )
-                elif len(top_element_split) > 2:
+                if len(top_element_split) > 2:
                     raise Exception(
                         "Top level config element {} appears malformed!".format(
                             top_element
