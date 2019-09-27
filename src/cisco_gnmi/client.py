@@ -52,13 +52,24 @@ class Client(Base):
     --------
     >>> from cisco_gnmi import Client
     >>> client = Client(
-    ...   '127.0.0.1:57400'
+    ...    '127.0.0.1:9339'
     ... ).as_secure(
-    ...   root_from_target=True,
-    ...   target_name_from_root=True
+    ...    root_from_target=True,
+    ...    target_name_from_root=True
     ... ).with_authentication(
-    ...   'admin',
-    ...   'its_a_secret'
+    ...    'admin',
+    ...    'its_a_secret'
+    ... )
+    >>> client = Client(
+    ...     '127.0.0.1:9339'
+    ... ).as_secure(
+    ...     root_certificates='rootCA.pem',
+    ...     private_key='client.key',
+    ...     certificate_chain='client.crt',
+    ...     from_file=True
+    ... ).with_authentication(
+    ...     'admin',
+    ...     'its_a_secret'
     ... )
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
@@ -69,6 +80,16 @@ class Client(Base):
         super(Client, self).__init__(target, timeout, proto.gnmi_pb2_grpc.gNMIStub)
         if attempt_implicit_secure:
             self.as_secure(root_from_target=True, target_name_from_root=True)
+    
+    def as_insecure(self, channel_options=None, compression=None):
+        """Uses an insecure, unencrypted gRPC channel for gNMI communications.
+        This is explicitly against specification and is not recommended.
+        Overrides Base method to present warning.
+        """
+        logging.warning(
+            "TLS MUST be enabled per gNMI specification. If utilizing the gNMI implementation without TLS, it is non-compliant."
+        )
+        super(Client, self).as_insecure(channel_options, compression)
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that

@@ -170,9 +170,7 @@ class Base(object):
         return self
 
     def as_insecure(self, channel_options=None, compression=None):
-        logging.warning(
-            "TLS MUST be enabled per gNMI specification. If utilizing the gNMI implementation without TLS, it is non-compliant."
-        )
+        """Creates an insecure channel, not encrypted, for gRPC."""
         if self.channel:
             self.channel.close()
         if self.channel_creds:
