@@ -48,7 +48,9 @@ class XRClient(Client):
 
     Examples
     --------
-    >>> from cisco_gnmi import XRClient
+    >>> from cisco_gnmi import ClientBuilder
+    >>> builder = ClientBuilder('127.0.0.1:9339')
+    >>> client = builder.
     >>> client = XRClient('127.0.0.1:9339').as_secure(
     ...     root_certificates='ems.pem',
     ...     channel_options=('grpc.ssl_target_name_override', 'ems.cisco.com'),
@@ -221,7 +223,7 @@ class XRClient(Client):
         request_mode="STREAM",
         sub_mode="SAMPLE",
         encoding="PROTO",
-        sample_interval=Client._NS_IN_S,
+        sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
     ):
@@ -260,7 +262,7 @@ class XRClient(Client):
             [JSON, BYTES, PROTO, ASCII, JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
-            Defaults to 5 seconds.
+            Defaults to 10 seconds.
         suppress_redundant : bool, optional
             Indicates whether values that have not changed should be sent in a SAMPLE subscription.
         heartbeat_interval : int, optional

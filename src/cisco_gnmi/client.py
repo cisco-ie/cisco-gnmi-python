@@ -27,12 +27,11 @@ import logging
 from xml.etree.ElementPath import xpath_tokenizer_re
 from six import string_types
 
-from .base import Base
 from . import proto
 from . import util
 
 
-class Client(Base):
+class Client(object):
     """gNMI gRPC wrapper client to ease usage of gNMI.
 
     Returns relatively raw response data. Response data may be accessed according
@@ -51,46 +50,51 @@ class Client(Base):
 
     Examples
     --------
+    >>> import grpc
     >>> from cisco_gnmi import Client
-    >>> client = Client(
-    ...    '127.0.0.1:9339'
-    ... ).as_secure(
-    ...    root_from_target=True,
-    ...    target_name_from_root=True
-    ... ).with_authentication(
-    ...    'admin',
-    ...    'its_a_secret'
+    >>> from cisco_gnmi.auth import CiscoAuthPlugin
+    >>> channel = grpc.secure_channel(
+    ...     '127.0.0.1:9339',
+    ...     grpc.composite_channel_credentials(
+    ...         grpc.ssl_channel_credentials(),
+    ...         grpc.metadata_call_credentials(
+    ...             CiscoAuthPlugin(
+    ...                  'admin',
+    ...                  'its_a_secret'
+    ...             )
+    ...         )
+    ...     )
     ... )
-    >>> client = Client(
-    ...     '127.0.0.1:9339'
-    ... ).as_secure(
-    ...     root_certificates='rootCA.pem',
-    ...     private_key='client.key',
-    ...     certificate_chain='client.crt',
-    ...     from_file=True
-    ... ).with_authentication(
-    ...     'admin',
-    ...     'its_a_secret'
-    ... )
+    >>> client = Client(channel)
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
-    ...
     """
 
-    def __init__(self, target, timeout=Base._C_MAX_LONG, attempt_implicit_secure=False):
-        super(Client, self).__init__(target, timeout, proto.gnmi_pb2_grpc.gNMIStub)
-        if attempt_implicit_secure:
-            self.as_secure(root_from_target=True, target_name_from_root=True)
+    """Defining property due to gRPC timeout being based on a C long type.
+    Should really define this based on architecture.
+    32-bit C long max value. "Infinity".
+    """
+    _C_MAX_LONG = 2147483647
 
-    def as_insecure(self, channel_options=None, compression=None):
-        """Uses an insecure, unencrypted gRPC channel for gNMI communications.
-        This is explicitly against specification and is not recommended.
-        Overrides Base method to present warning.
+    # gNMI uses nanoseconds, baseline to seconds
+    _NS_IN_S = int(1e9)
+
+    def __init__(self, grpc_channel, timeout=_C_MAX_LONG):
+        """gNMI initialization wrapper which simply wraps some aspects of the gNMI stub.
+
+        Parameters
+        ----------
+        grpc_channel : grpc.Channel
+            The gRPC channel to initialize the gNMI stub with.
+            Use ClientBuilder if unfamiliar with gRPC.
+        username : str
+            Username to authenticate gNMI RPCs.
+        password : str
+            Password to authenticate gNMI RPCs.
+        timeout : uint
+            Timeout for gRPC functionality.
         """
-        logging.warning(
-            "TLS MUST be enabled per gNMI specification. If utilizing the gNMI implementation without TLS, it is non-compliant."
-        )
-        return super(Client, self).as_insecure(channel_options, compression)
+        self.service = proto.gnmi_pb2_grpc.gNMIStub(grpc_channel)
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
@@ -160,7 +164,7 @@ class Client(Base):
             request.use_models = use_models
         if extension:
             request.extension = extension
-        get_response = self.service.Get(request, metadata=self._gen_metadata())
+        get_response = self.service.Get(request)
         return get_response
 
     def set(
@@ -208,7 +212,7 @@ class Client(Base):
         if extensions:
             for extension in extensions:
                 request.extension.append(extension)
-        response = self.service.Set(request, metadata=self._gen_metadata())
+        response = self.service.Set(request)
         return response
 
     def subscribe(self, request_iter, extensions=None):
@@ -249,8 +253,7 @@ class Client(Base):
             return subscribe_request
 
         response_stream = self.service.Subscribe(
-            (validate_request(request) for request in request_iter),
-            metadata=self._gen_metadata(),
+            (validate_request(request) for request in request_iter)
         )
         return response_stream
 
@@ -274,9 +277,11 @@ class Client(Base):
         in_filter = False
         just_filtered = False
         curr_key = None
+        # TODO: Lazy
+        xpath = xpath.strip('/')
         xpath_elements = xpath_tokenizer_re.findall(xpath)
         for index, element in enumerate(xpath_elements):
-            # xpath_tokenizer_re strips initial /, so this indicates a completed element
+            # stripped initial /, so this indicates a completed element
             if element[0] == "/":
                 if not curr_elem.name:
                     raise Exception(

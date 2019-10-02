@@ -21,7 +21,13 @@ License for the specific language governing permissions and limitations under
 the License.
 """
 
+"""Contains useful functionality generally applicable for manipulation of cisco_gnmi."""
+
 import logging
+import ssl
+
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 
 try:
     # Python 3
@@ -71,3 +77,29 @@ def validate_proto_enum(value_name, value, enum_name, enum):
     else:
         enum_value = value
     return enum_value
+
+def get_cert_from_target(target_netloc):
+    """Retrieves the SSL certificate from a secure server."""
+    return ssl.get_server_certificate(
+        (target_netloc.hostname, target_netloc.port)
+    ).encode("utf-8")
+
+def get_cn_from_cert(cert_pem):
+    """Attempts to derive the CN from a supplied certficate.
+    Defaults to first found if multiple CNs identified.
+    """
+    cert_cn = None
+    cert_parsed = x509.load_pem_x509_certificate(cert_pem, default_backend())
+    cert_cns = cert_parsed.subject.get_attributes_for_oid(
+        x509.oid.NameOID.COMMON_NAME
+    )
+    if len(cert_cns) > 0:
+        if len(cert_cns) > 1:
+            logging.warning(
+                "Multiple CNs found for certificate, defaulting to the first one."
+            )
+        cert_cn = cert_cns[0].value
+        logging.debug("Using %s as certificate CN.", cert_cn)
+    else:
+        logging.warning("No CN found for certificate.")
+    return cert_cn
