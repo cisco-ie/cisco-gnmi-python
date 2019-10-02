@@ -26,7 +26,7 @@ the License.
 import logging
 
 import grpc
-from . import Client, XRClient
+from . import Client, XRClient, NXClient
 from .auth import CiscoAuthPlugin
 from .util import gen_target_netloc, get_cert_from_target, get_cn_from_cert
 
@@ -111,14 +111,15 @@ class ClientBuilder(object):
         ----------
         name : str
             "IOS XR" maps to the XRClient class.
+            "NX-OS" maps to the NXClient class.
             None maps to the base Client class which simply wraps the gNMI stub.
-            ["IOS XR", None]
+            ["IOS XR", "NX-OS", None]
         
         Returns
         -------
         self
         """
-        os_class_map = {None: Client, "IOS XR": XRClient}
+        os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient}
         if name not in os_class_map.keys():
             raise Exception("OS not supported!")
         else:
