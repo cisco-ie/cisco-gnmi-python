@@ -109,7 +109,7 @@ class Client(object):
         proto.gnmi_pb2.CapabilityResponse
         """
         message = proto.gnmi_pb2.CapabilityRequest()
-        response = self.service.Capabilities(message, metadata=self._gen_metadata())
+        response = self.service.Capabilities(message)
         return response
 
     def get(
