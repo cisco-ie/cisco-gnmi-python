@@ -38,6 +38,8 @@ class ClientBuilder(object):
 
     Methods
     -------
+    set_target(...)
+        Specifies the network element to build a client for.
     set_os(...)
         Specifies which OS wrapper to deliver.
     set_secure(...)
@@ -54,7 +56,7 @@ class ClientBuilder(object):
         Sets a gRPC channel option. Implies knowledge of channel options.
     construct()
         Constructs and returns the built Client.
-    _reset(...)
+    _reset()
         Resets builder to baseline state.
     
     Examples
@@ -82,7 +84,25 @@ class ClientBuilder(object):
             The target address of the network element to interact with.
             Expects a URL-like form, e.g. 127.0.0.1:9339
         """
-        self._reset(target)
+        self.set_target(target)
+        self._reset()
+
+    def set_target(self, target):
+        """Specifies the network element to build a client for.
+
+        Parameters
+        ----------
+        target : str
+            The target address of the network element to interact with.
+            Expects a URL-like form, e.g. 127.0.0.1:9339
+        
+        Returns
+        -------
+        self
+        """
+        self.__target = target
+        self.__target_netloc = gen_target_netloc(self.__target)
+        return self
 
     def set_os(self, name=None):
         """Sets which OS to target which maps to an OS wrapper class.
@@ -272,18 +292,17 @@ class ClientBuilder(object):
         if self.__client_class is None:
             self.set_os()
         client = self.__client_class(channel)
-        self._reset(self.__target)
+        self._reset()
         return client
 
-    def _reset(self, target):
+    def _reset(self):
         """Resets the builder.
         
         Returns
         -------
         self
         """
-        self.__target = target
-        self.__target_netloc = gen_target_netloc(self.__target)
+        self.set_target(self.__target)
         self.__client_class = None
         self.__root_certificates = None
         self.__private_key = None

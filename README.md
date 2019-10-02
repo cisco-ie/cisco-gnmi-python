@@ -18,6 +18,8 @@ It is *highly* recommended that users of the library learn [Google Protocol Buff
 Since `v1.0.0` a builder pattern is available with `ClientBuilder`. `ClientBuilder` provides several `set_*` methods which define the intended `Client` connectivity and a `construct` method to construct and return the desired `Client`. There are several major methods involved here:
 
 ```
+    set_target(...)
+        Specifies the network element to build a client for.
     set_os(...)
         Specifies which OS wrapper to deliver.
     set_secure(...)
