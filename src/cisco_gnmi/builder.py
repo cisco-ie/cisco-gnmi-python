@@ -65,7 +65,7 @@ class ClientBuilder(object):
     >>> client = ClientBuilder(
     ...     '127.0.0.1:9339'
     ... ).set_os(
-    ...     'IOS-XR'
+    ...     'IOS XR'
     ... ).set_secure_from_target().set_ssl_target_override().set_authentication(
     ...     'admin',
     ...     'its_a_secret'
@@ -110,15 +110,15 @@ class ClientBuilder(object):
         Parameters
         ----------
         name : str
-            "IOS-XR" maps to the XRClient class.
+            "IOS XR" maps to the XRClient class.
             None maps to the base Client class which simply wraps the gNMI stub.
-            ["IOS-XR", None]
+            ["IOS XR", None]
         
         Returns
         -------
         self
         """
-        os_class_map = {None: Client, "IOS-XR": XRClient}
+        os_class_map = {None: Client, "IOS XR": XRClient}
         if name not in os_class_map.keys():
             raise Exception("OS not supported!")
         else:

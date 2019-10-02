@@ -50,7 +50,7 @@ class XRClient(Client):
     --------
     >>> from cisco_gnmi import ClientBuilder
     >>> client = ClientBuilder('127.0.0.1:9339').set_os(
-    ...     'IOS-XR'
+    ...     'IOS XR'
     ... ).set_secure_from_file(
     ...     'ems.pem',
     ... ).set_ssl_target_override().set_call_authentication(

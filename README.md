@@ -45,14 +45,14 @@ Since `v1.0.0` a builder pattern is available with `ClientBuilder`. `ClientBuild
 from cisco_gnmi import ClientBuilder
 
 builder = ClientBuilder('127.0.0.1:9339')
-builder.set_os('IOS-XR')
+builder.set_os('IOS XR')
 builder.set_secure_from_target()
 builder.set_call_authentication('admin', 'its_a_secret')
 client = builder.construct()
 
 # Or...
 
-client = ClientBuilder('127.0.0.1:9339').set_os('IOS-XR').set_secure_from_target().set_call_authentication('admin', 'its_a_secret').construct()
+client = ClientBuilder('127.0.0.1:9339').set_os('IOS XR').set_secure_from_target().set_call_authentication('admin', 'its_a_secret').construct()
 ```
 
 Using an encrypted channel automatically getting the certificate from the device, quick for testing:
@@ -62,7 +62,7 @@ from cisco_gnmi import ClientBuilder
 
 client = ClientBuilder(
     '127.0.0.1:9339'
-).set_os('IOS-XR').set_secure_from_target().set_call_authentication(
+).set_os('IOS XR').set_secure_from_target().set_call_authentication(
     'admin',
     'its_a_secret'
 ).construct()
@@ -75,7 +75,7 @@ from cisco_gnmi import ClientBuilder
 
 client = ClientBuilder(
     '127.0.0.1:9339'
-).set_os('IOS-XR').set_secure_from_file(
+).set_os('IOS XR').set_secure_from_file(
     'ems.pem'
 ).set_call_authentication(
     'admin',
@@ -94,7 +94,7 @@ with open('ems.pem', 'rb') as cert_fd:
 
 client = ClientBuilder(
     '127.0.0.1:9339'
-).set_secure(
+).set_os('IOS XR').set_secure(
     root_cert
 ).set_call_authentication(
     'admin',
@@ -109,7 +109,7 @@ from cisco_gnmi import ClientBuilder
 
 client = ClientBuilder(
     '127.0.0.1:9339'
-).set_secure_from_file(
+).set_os('IOS XR').set_secure_from_file(
     root_certificates='rootCA.pem',
     private_key='client.key',
     certificate_chain='client.crt',
