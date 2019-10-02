@@ -49,16 +49,14 @@ class XRClient(Client):
     Examples
     --------
     >>> from cisco_gnmi import ClientBuilder
-    >>> builder = ClientBuilder('127.0.0.1:9339')
-    >>> client = builder.
-    >>> client = XRClient('127.0.0.1:9339').as_secure(
-    ...     root_certificates='ems.pem',
-    ...     channel_options=('grpc.ssl_target_name_override', 'ems.cisco.com'),
-    ...     from_file=True
-    ... ).with_authentication(
+    >>> client = ClientBuilder('127.0.0.1:9339').set_os(
+    ...     'IOS-XR'
+    ... ).set_secure_from_file(
+    ...     'ems.pem',
+    ... ).set_ssl_target_override().set_call_authentication(
     ...     'admin',
     ...     'its_a_secret'
-    ... )
+    ... ).construct()
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...
