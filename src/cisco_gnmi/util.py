@@ -78,11 +78,13 @@ def validate_proto_enum(value_name, value, enum_name, enum):
         enum_value = value
     return enum_value
 
+
 def get_cert_from_target(target_netloc):
     """Retrieves the SSL certificate from a secure server."""
     return ssl.get_server_certificate(
         (target_netloc.hostname, target_netloc.port)
     ).encode("utf-8")
+
 
 def get_cn_from_cert(cert_pem):
     """Attempts to derive the CN from a supplied certficate.
@@ -90,9 +92,7 @@ def get_cn_from_cert(cert_pem):
     """
     cert_cn = None
     cert_parsed = x509.load_pem_x509_certificate(cert_pem, default_backend())
-    cert_cns = cert_parsed.subject.get_attributes_for_oid(
-        x509.oid.NameOID.COMMON_NAME
-    )
+    cert_cns = cert_parsed.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
     if len(cert_cns) > 0:
         if len(cert_cns) > 1:
             logging.warning(

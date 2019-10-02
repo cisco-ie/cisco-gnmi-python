@@ -23,6 +23,7 @@ the License.
 
 import grpc
 
+
 class CiscoAuthPlugin(grpc.AuthMetadataPlugin):
     """A gRPC AuthMetadataPlugin which adds username/password metadata to each call."""
 

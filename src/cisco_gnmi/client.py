@@ -278,7 +278,7 @@ class Client(object):
         just_filtered = False
         curr_key = None
         # TODO: Lazy
-        xpath = xpath.strip('/')
+        xpath = xpath.strip("/")
         xpath_elements = xpath_tokenizer_re.findall(xpath)
         for index, element in enumerate(xpath_elements):
             # stripped initial /, so this indicates a completed element

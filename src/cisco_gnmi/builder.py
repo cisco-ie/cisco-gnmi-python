@@ -72,7 +72,6 @@ class ClientBuilder(object):
     >>> print(capabilities)
     """
 
-
     def __init__(self, target):
         """Initializes the builder, most initialization is done via set_* methods.
         A target is always required, thus a member of the constructor.
@@ -84,7 +83,7 @@ class ClientBuilder(object):
             Expects a URL-like form, e.g. 127.0.0.1:9339
         """
         self._reset(target)
-    
+
     def set_os(self, name=None):
         """Sets which OS to target which maps to an OS wrapper class.
 
@@ -99,18 +98,17 @@ class ClientBuilder(object):
         -------
         self
         """
-        os_class_map = {
-            None: Client,
-            "IOS-XR": XRClient
-        }
+        os_class_map = {None: Client, "IOS-XR": XRClient}
         if name not in os_class_map.keys():
             raise Exception("OS not supported!")
         else:
             self.__client_class = os_class_map[name]
         logging.debug("Using %s wrapper.", name or "Client")
         return self
-    
-    def set_secure(self, root_certificates=None, private_key=None, certificate_chain=None):
+
+    def set_secure(
+        self, root_certificates=None, private_key=None, certificate_chain=None
+    ):
         """Simply sets the fields to be expected by grpc.ssl_channel_credentials(...).
         Setting this method disallows following set_secure(...) or _set_insecure() calls.
 
@@ -128,8 +126,10 @@ class ClientBuilder(object):
         self.__private_key = private_key
         self.__certificate_chain = certificate_chain
         return self
-    
-    def set_secure_from_file(self, root_certificates=None, private_key=None, certificate_chain=None):
+
+    def set_secure_from_file(
+        self, root_certificates=None, private_key=None, certificate_chain=None
+    ):
         """Wraps set_secure(...) but treats arguments as file paths.
 
         Parameters
@@ -142,12 +142,14 @@ class ClientBuilder(object):
         -------
         self
         """
+
         def load_cert(file_path):
             cert_content = None
             if file_path is not None:
-                with open(file_path, 'rb') as cert_fd:
+                with open(file_path, "rb") as cert_fd:
                     cert_content = cert_fd.read()
             return cert_content
+
         if root_certificates:
             root_certificates = load_cert(root_certificates)
         if private_key:
@@ -156,7 +158,7 @@ class ClientBuilder(object):
             certificate_chain = load_cert(certificate_chain)
         self.set_secure(root_certificates, private_key, certificate_chain)
         return self
-    
+
     def set_secure_from_target(self):
         """Wraps set_secure(...) but loads root certificates from target.
         In effect, simply uses the target's certificate to create an encrypted channel.
@@ -197,10 +199,14 @@ class ClientBuilder(object):
             if not self.__root_certificates:
                 raise Exception("Deriving override requires root certificate!")
             ssl_target_name_override = get_cn_from_cert(self.__root_certificates)
-            logging.warning("Overriding SSL option from certificate could increase MITM susceptibility!")
-        self.set_channel_option("grpc.ssl_target_name_override", ssl_target_name_override)
+            logging.warning(
+                "Overriding SSL option from certificate could increase MITM susceptibility!"
+            )
+        self.set_channel_option(
+            "grpc.ssl_target_name_override", ssl_target_name_override
+        )
         return self
-    
+
     def set_channel_option(self, name, value):
         """Sets a gRPC channel option. This method implies understanding of gRPC channels.
         If the option is found, the value is overwritten.
@@ -249,32 +255,26 @@ class ClientBuilder(object):
         )
         if self.__username and self.__password:
             channel_metadata_creds = grpc.metadata_call_credentials(
-                CiscoAuthPlugin(
-                    self.__username,
-                    self.__password
-                )
+                CiscoAuthPlugin(self.__username, self.__password)
             )
             logging.debug("Using username/password call authentication.")
         if channel_ssl_creds and channel_metadata_creds:
             channel_creds = grpc.composite_channel_credentials(
-                channel_ssl_creds,
-                channel_metadata_creds
+                channel_ssl_creds, channel_metadata_creds
             )
             logging.debug("Using SSL/metadata authentication composite credentials.")
         else:
             channel_creds = channel_ssl_creds
             logging.debug("Using SSL credentials, no metadata authentication.")
         channel = grpc.secure_channel(
-            self.__target_netloc.netloc,
-            channel_creds,
-            self.__channel_options
+            self.__target_netloc.netloc, channel_creds, self.__channel_options
         )
         if self.__client_class is None:
             self.set_os()
         client = self.__client_class(channel)
         self._reset(self.__target)
         return client
-    
+
     def _reset(self, target):
         """Resets the builder.
         
