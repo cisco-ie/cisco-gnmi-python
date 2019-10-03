@@ -14,13 +14,119 @@ This library covers the gNMI defined `capabilities`, `get`, `set`, and `subscrib
 
 It is *highly* recommended that users of the library learn [Google Protocol Buffers](https://developers.google.com/protocol-buffers/) syntax to significantly ease usage. Understanding how to read Protocol Buffers, and reference [`gnmi.proto`](https://github.com/openconfig/gnmi/blob/master/proto/gnmi/gnmi.proto), will be immensely useful for utilizing gNMI and any other gRPC interface.
 
+### ClientBuilder
+Since `v1.0.0` a builder pattern is available with `ClientBuilder`. `ClientBuilder` provides several `set_*` methods which define the intended `Client` connectivity and a `construct` method to construct and return the desired `Client`. There are several major methods involved here:
+
+```
+    set_target(...)
+        Specifies the network element to build a client for.
+    set_os(...)
+        Specifies which OS wrapper to deliver.
+    set_secure(...)
+        Specifies that a secure gRPC channel should be used.
+    set_secure_from_file(...)
+        Loads certificates from file system for secure gRPC channel.
+    set_secure_from_target(...)
+        Attempts to utilize available certificate from target for secure gRPC channel.
+    set_call_authentication(...)
+        Specifies username/password to utilize for authentication.
+    set_ssl_target_override(...)
+        Sets the gRPC option to override the SSL target name.
+    set_channel_option(...)
+        Sets a gRPC channel option. Implies knowledge of channel options.
+    construct()
+        Constructs and returns the built Client.
+```
+
+#### Initialization Examples
+`ClientBuilder` can be chained for initialization or instantiated line-by-line.
+
+```python
+from cisco_gnmi import ClientBuilder
+
+builder = ClientBuilder('127.0.0.1:9339')
+builder.set_os('IOS XR')
+builder.set_secure_from_target()
+builder.set_call_authentication('admin', 'its_a_secret')
+client = builder.construct()
+
+# Or...
+
+client = ClientBuilder('127.0.0.1:9339').set_os('IOS XR').set_secure_from_target().set_call_authentication('admin', 'its_a_secret').construct()
+```
+
+Using an encrypted channel automatically getting the certificate from the device, quick for testing:
+
+```python
+from cisco_gnmi import ClientBuilder
+
+client = ClientBuilder(
+    '127.0.0.1:9339'
+).set_os('IOS XR').set_secure_from_target().set_call_authentication(
+    'admin',
+    'its_a_secret'
+).construct()
+```
+
+Using an owned root certificate on the filesystem:
+
+```python
+from cisco_gnmi import ClientBuilder
+
+client = ClientBuilder(
+    '127.0.0.1:9339'
+).set_os('IOS XR').set_secure_from_file(
+    'ems.pem'
+).set_call_authentication(
+    'admin',
+    'its_a_secret'
+).construct()
+```
+
+Passing certificate content to method:
+
+```python
+from cisco_gnmi import ClientBuilder
+
+# Note reading as bytes
+with open('ems.pem', 'rb') as cert_fd:
+    root_cert = cert_fd.read()
+
+client = ClientBuilder(
+    '127.0.0.1:9339'
+).set_os('IOS XR').set_secure(
+    root_cert
+).set_call_authentication(
+    'admin',
+    'its_a_secret'
+).construct()
+```
+
+Usage with root certificate, private key, and cert chain:
+
+```python
+from cisco_gnmi import ClientBuilder
+
+client = ClientBuilder(
+    '127.0.0.1:9339'
+).set_os('IOS XR').set_secure_from_file(
+    root_certificates='rootCA.pem',
+    private_key='client.key',
+    certificate_chain='client.crt',
+).set_call_authentication(
+    'admin',
+    'its_a_secret'
+).construct()
+```
+
+
 ### Client
 `Client` is a very barebones class simply implementing `capabilities`, `get`, `set`, and `subscribe` methods. It provides some context around the expectation for what should be supplied to these RPC functions and helpers for validation.
 
 Methods are documented in [`src/cisco_gnmi/client.py`](src/cisco_gnmi/client.py).
 
 ### XRClient
-`XRClient` inherets from `Client` and provides several wrapper methods which aid with IOS XR-specific behaviors of the gNMI implementation. These are `delete_xpaths`, `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods make several assumptions about what kind of information will be supplied to them in order to simplify usage of the gNMI RPCs.
+`XRClient` inherets from `Client` and provides several wrapper methods which aid with IOS XR-specific behaviors of the gNMI implementation. These are `delete_xpaths`, `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods make several assumptions about what kind of information will be supplied to them in order to simplify usage of the gNMI RPCs, detailed in the documentation.
 
 Methods are documented in [`src/cisco_gnmi/xr.py`](src/cisco_gnmi/xr.py).
 

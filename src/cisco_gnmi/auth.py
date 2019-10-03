@@ -21,11 +21,16 @@ License for the specific language governing permissions and limitations under
 the License.
 """
 
-"""This library wraps gNMI functionality to ease usage in Python programs."""
+import grpc
 
 
-from .client import Client
-from .xr import XRClient
-from .builder import ClientBuilder
+class CiscoAuthPlugin(grpc.AuthMetadataPlugin):
+    """A gRPC AuthMetadataPlugin which adds username/password metadata to each call."""
 
-__version__ = "1.0.0"
+    def __init__(self, username, password):
+        super(CiscoAuthPlugin, self).__init__()
+        self.username = username
+        self.password = password
+
+    def __call__(self, context, callback):
+        callback([("username", self.username), ("password", self.password)], None)

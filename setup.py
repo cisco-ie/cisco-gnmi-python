@@ -52,8 +52,8 @@ setup(
     install_requires=[
         "grpcio",
         "protobuf",
-        "enum34",
         "six",
+        "cryptography",
     ],
     extras_require={
         "dev": [

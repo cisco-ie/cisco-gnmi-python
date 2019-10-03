@@ -35,13 +35,6 @@ class XRClient(Client):
 
     Returns direct responses from base Client methods.
 
-    Attributes
-    ----------
-    username : str
-    password : str
-    timeout : uint
-    tls_enabled : bool
-
     Methods
     -------
     delete_xpaths(...)
@@ -55,8 +48,15 @@ class XRClient(Client):
 
     Examples
     --------
-    >>> from gnmi import XRClient
-    >>> client = XRClient('127.0.0.1:57400', 'demo', 'demo', credentials='ems.pem', tls_server_override='ems.cisco.com', credentials_from_file=True)
+    >>> from cisco_gnmi import ClientBuilder
+    >>> client = ClientBuilder('127.0.0.1:9339').set_os(
+    ...     'IOS XR'
+    ... ).set_secure_from_file(
+    ...     'ems.pem',
+    ... ).set_ssl_target_override().set_call_authentication(
+    ...     'admin',
+    ...     'its_a_secret'
+    ... ).construct()
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...
@@ -102,7 +102,7 @@ class XRClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            paths.append(util.parse_xpath_to_gnmi_path(xpath))
+            paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
     def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
@@ -163,7 +163,7 @@ class XRClient(Client):
                             top_element
                         )
                     )
-                elif len(top_element_split) > 2:
+                if len(top_element_split) > 2:
                     raise Exception(
                         "Top level config element {} appears malformed!".format(
                             top_element
@@ -173,7 +173,7 @@ class XRClient(Client):
                 element = top_element_split[1]
                 config = config.pop(top_element)
                 update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(util.parse_xpath_to_gnmi_path(element, origin))
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(element, origin))
                 if ietf:
                     update.val.json_ietf_val = json.dumps(config).encode("utf-8")
                 else:
@@ -195,8 +195,10 @@ class XRClient(Client):
             If simply a str, wraps as a list for convenience
         data_type : proto.gnmi_pb2.GetRequest.DataType, optional
             A direct value or key from the GetRequest.DataType enum
+            [ALL, CONFIG, STATE, OPERATIONAL]
         encoding : proto.gnmi_pb2.GetRequest.Encoding, optional
             A direct value or key from the Encoding enum
+            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
 
         Returns
         -------
@@ -204,9 +206,9 @@ class XRClient(Client):
         """
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = map(util.parse_xpath_to_gnmi_path, set(xpaths))
+            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [util.parse_xpath_to_gnmi_path(xpaths)]
+            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
@@ -219,7 +221,7 @@ class XRClient(Client):
         request_mode="STREAM",
         sub_mode="SAMPLE",
         encoding="PROTO",
-        sample_interval=Client._NS_IN_S,
+        sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
     ):
@@ -258,7 +260,7 @@ class XRClient(Client):
             [JSON, BYTES, PROTO, ASCII, JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
-            Defaults to 5 seconds.
+            Defaults to 10 seconds.
         suppress_redundant : bool, optional
             Indicates whether values that have not changed should be sent in a SAMPLE subscription.
         heartbeat_interval : int, optional
@@ -287,7 +289,7 @@ class XRClient(Client):
             if isinstance(xpath_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
-                    util.parse_xpath_to_gnmi_path(xpath_subscription)
+                    self.parse_xpath_to_gnmi_path(xpath_subscription)
                 )
                 subscription.mode = util.validate_proto_enum(
                     "sub_mode",
@@ -300,7 +302,7 @@ class XRClient(Client):
                 if heartbeat_interval:
                     subscription.heartbeat_interval = heartbeat_interval
             elif isinstance(xpath_subscription, dict):
-                path = util.parse_xpath_to_gnmi_path(xpath_subscription["path"])
+                path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
                 arg_dict = {
                     "path": path,
                     "mode": sub_mode,
@@ -324,3 +326,17 @@ class XRClient(Client):
                 raise Exception("xpath in list must be xpath or dict/Path!")
             subscription_list.subscription.append(subscription)
         return self.subscribe([subscription_list])
+
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """No origin specified implies openconfig
+        Otherwise origin is expected to be the module name
+        """
+        if origin is None:
+            # naive but effective
+            if xpath.startswith("openconfig") or ":" not in xpath:
+                # openconfig
+                origin = None
+            else:
+                # module name
+                origin = xpath.split(":")[0]
+        return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)

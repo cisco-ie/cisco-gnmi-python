@@ -23,7 +23,9 @@ the License.
 
 """Python gNMI wrapper to ease usage of gNMI."""
 
-import json
+import logging
+from xml.etree.ElementPath import xpath_tokenizer_re
+from six import string_types
 
 from . import proto
 from . import util
@@ -34,13 +36,6 @@ class Client(object):
 
     Returns relatively raw response data. Response data may be accessed according
     to the gNMI specification.
-
-    Attributes
-    ----------
-    username : str
-    password : str
-    timeout : uint
-    tls_enabled : bool
 
     Methods
     -------
@@ -55,11 +50,24 @@ class Client(object):
 
     Examples
     --------
-    >>> from gnmi import Client
-    >>> client = Client('127.0.0.1:57400', 'demo', 'demo')
+    >>> import grpc
+    >>> from cisco_gnmi import Client
+    >>> from cisco_gnmi.auth import CiscoAuthPlugin
+    >>> channel = grpc.secure_channel(
+    ...     '127.0.0.1:9339',
+    ...     grpc.composite_channel_credentials(
+    ...         grpc.ssl_channel_credentials(),
+    ...         grpc.metadata_call_credentials(
+    ...             CiscoAuthPlugin(
+    ...                  'admin',
+    ...                  'its_a_secret'
+    ...             )
+    ...         )
+    ...     )
+    ... )
+    >>> client = Client(channel)
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
-    ...
     """
 
     """Defining property due to gRPC timeout being based on a C long type.
@@ -68,68 +76,25 @@ class Client(object):
     """
     _C_MAX_LONG = 2147483647
 
+    # gNMI uses nanoseconds, baseline to seconds
     _NS_IN_S = int(1e9)
 
-    def __init__(
-        self,
-        target,
-        username,
-        password,
-        timeout=_C_MAX_LONG,
-        credentials=None,
-        credentials_from_file=False,
-        tls_server_override=None,
-        tls_enabled=True,
-    ):
-        """Initializes the gNMI gRPC client stub and defines auxiliary attributes.
+    def __init__(self, grpc_channel, timeout=_C_MAX_LONG):
+        """gNMI initialization wrapper which simply wraps some aspects of the gNMI stub.
 
         Parameters
         ----------
-        target : str
-            The host[:port] to issue gNMI requests against.
+        grpc_channel : grpc.Channel
+            The gRPC channel to initialize the gNMI stub with.
+            Use ClientBuilder if unfamiliar with gRPC.
         username : str
+            Username to authenticate gNMI RPCs.
         password : str
-        timeout : uint, optional
-            Timeout for request which sets a deadline for return.
-            Defaults to "infinity"
-        credentials : str, optional
-            PEM contents or PEM file path.
-        credentials_from_file : bool, optional
-            Indicates that credentials is a file path.
-        tls_server_override : str, optional
-            TLS server name if PEM will not match.
-            Please only utilize in testing.
-        tls_enabled : bool, optional
-            Whether or not to utilize a secure channel.
-            If disabled, and functional, gNMI server is against specification.
+            Password to authenticate gNMI RPCs.
+        timeout : uint
+            Timeout for gRPC functionality.
         """
-        self.username = username
-        self.password = password
-        self.timeout = int(timeout)
-        self.tls_enabled = tls_enabled
-        self.__target = util.gen_target(target)
-        self.__credentials = util.gen_credentials(credentials, credentials_from_file)
-        self.__options = util.gen_options(tls_server_override)
-        self.__client = util.gen_client(
-            self.__target, self.__credentials, self.__options, self.tls_enabled
-        )
-
-    def __repr__(self):
-        """JSON dump a dict of basic attributes."""
-        return json.dumps(
-            {
-                "target": self.__target,
-                "tls_enabled": self.tls_enabled,
-                "is_secure": bool(self.__credentials),
-                "username": self.username,
-                "password": self.password,
-                "timeout": self.timeout,
-            }
-        )
-
-    def __gen_metadata(self):
-        """Generates expected gRPC call metadata."""
-        return [("username", self.username), ("password", self.password)]
+        self.service = proto.gnmi_pb2_grpc.gNMIStub(grpc_channel)
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
@@ -144,7 +109,7 @@ class Client(object):
         proto.gnmi_pb2.CapabilityResponse
         """
         message = proto.gnmi_pb2.CapabilityRequest()
-        response = self.__client.Capabilities(message, metadata=self.__gen_metadata())
+        response = self.service.Capabilities(message)
         return response
 
     def get(
@@ -199,7 +164,7 @@ class Client(object):
             request.use_models = use_models
         if extension:
             request.extension = extension
-        get_response = self.__client.Get(request, metadata=self.__gen_metadata())
+        get_response = self.service.Get(request)
         return get_response
 
     def set(
@@ -247,7 +212,7 @@ class Client(object):
         if extensions:
             for extension in extensions:
                 request.extension.append(extension)
-        response = self.__client.Set(request, metadata=self.__gen_metadata())
+        response = self.service.Set(request)
         return response
 
     def subscribe(self, request_iter, extensions=None):
@@ -287,8 +252,89 @@ class Client(object):
                     subscribe_request.extensions.append(extension)
             return subscribe_request
 
-        response_stream = self.__client.Subscribe(
-            (validate_request(request) for request in request_iter),
-            metadata=self.__gen_metadata(),
+        response_stream = self.service.Subscribe(
+            (validate_request(request) for request in request_iter)
         )
         return response_stream
+
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """Parses an XPath to proto.gnmi_pb2.Path.
+        This function should be overridden by any child classes for origin logic.
+
+        Effectively wraps the std XML XPath tokenizer and traverses
+        the identified groups. Parsing robustness needs to be validated.
+        Probably best to formalize as a state machine sometime.
+        TODO: Formalize tokenizer traversal via state machine.
+        """
+        if not isinstance(xpath, string_types):
+            raise Exception("xpath must be a string!")
+        path = proto.gnmi_pb2.Path()
+        if origin:
+            if not isinstance(origin, string_types):
+                raise Exception("origin must be a string!")
+            path.origin = origin
+        curr_elem = proto.gnmi_pb2.PathElem()
+        in_filter = False
+        just_filtered = False
+        curr_key = None
+        # TODO: Lazy
+        xpath = xpath.strip("/")
+        xpath_elements = xpath_tokenizer_re.findall(xpath)
+        for index, element in enumerate(xpath_elements):
+            # stripped initial /, so this indicates a completed element
+            if element[0] == "/":
+                if not curr_elem.name:
+                    raise Exception(
+                        "Current PathElem has no name yet is trying to be pushed to path! Invalid XPath?"
+                    )
+                path.elem.append(curr_elem)
+                curr_elem = proto.gnmi_pb2.PathElem()
+                continue
+            # We are entering a filter
+            elif element[0] == "[":
+                in_filter = True
+                continue
+            # We are exiting a filter
+            elif element[0] == "]":
+                in_filter = False
+                continue
+            # If we're not in a filter then we're a PathElem name
+            elif not in_filter:
+                curr_elem.name = element[1]
+            # Skip blank spaces
+            elif not any([element[0], element[1]]):
+                continue
+            # If we're in the filter and just completed a filter expr,
+            # "and" as a junction should just be ignored.
+            elif in_filter and just_filtered and element[1] == "and":
+                just_filtered = False
+                continue
+            # Otherwise we're in a filter and this term is a key name
+            elif curr_key is None:
+                curr_key = element[1]
+                continue
+            # Otherwise we're an operator or the key value
+            elif curr_key is not None:
+                # I think = is the only possible thing to support with PathElem syntax as is
+                if element[0] in [">", "<"]:
+                    raise Exception("Only = supported as filter operand!")
+                if element[0] == "=":
+                    continue
+                else:
+                    # We have a full key here, put it in the map
+                    if curr_key in curr_elem.key.keys():
+                        raise Exception("Key already in key map!")
+                    curr_elem.key[curr_key] = element[0].strip("'\"")
+                    curr_key = None
+                    just_filtered = True
+        # Keys/filters in general should be totally cleaned up at this point.
+        if curr_key:
+            raise Exception("Hanging key filter! Incomplete XPath?")
+        # If we have a dangling element that hasn't been completed due to no
+        # / element then let's just append the final element.
+        if curr_elem:
+            path.elem.append(curr_elem)
+            curr_elem = None
+        if any([curr_elem, curr_key, in_filter]):
+            raise Exception("Unfinished elements in XPath parsing!")
+        return path
