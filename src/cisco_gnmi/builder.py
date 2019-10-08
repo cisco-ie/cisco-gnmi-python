@@ -26,7 +26,7 @@ the License.
 import logging
 
 import grpc
-from . import Client, XRClient, NXClient
+from . import Client, XRClient, NXClient, XEClient
 from .auth import CiscoAuthPlugin
 from .util import gen_target_netloc, get_cert_from_target, get_cn_from_cert
 
@@ -74,7 +74,7 @@ class ClientBuilder(object):
     >>> print(capabilities)
     """
 
-    os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient}
+    os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient, "IOS-XE": XEClient}
 
     def __init__(self, target):
         """Initializes the builder, most initialization is done via set_* methods.
