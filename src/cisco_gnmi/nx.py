@@ -103,15 +103,23 @@ class NXClient(Client):
         -------
         subscribe()
         """
+        supported_request_modes = ["STREAM", "ONCE", "POLL"]
+        supported_encodings = ["JSON", "PROTO"]
+        supported_sub_modes = ["ON_CHANGE", "SAMPLE"]
         subscription_list = proto.gnmi_pb2.SubscriptionList()
         subscription_list.mode = util.validate_proto_enum(
             "mode",
             request_mode,
             "SubscriptionList.Mode",
             proto.gnmi_pb2.SubscriptionList.Mode,
+            supported_request_modes,
         )
         subscription_list.encoding = util.validate_proto_enum(
-            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
+            "encoding",
+            encoding,
+            "Encoding",
+            proto.gnmi_pb2.Encoding,
+            supported_encodings,
         )
         if isinstance(xpath_subscriptions, string_types):
             xpath_subscriptions = [xpath_subscriptions]
@@ -127,6 +135,7 @@ class NXClient(Client):
                     sub_mode,
                     "SubscriptionMode",
                     proto.gnmi_pb2.SubscriptionMode,
+                    supported_sub_modes,
                 )
                 subscription.sample_interval = sample_interval
             elif isinstance(xpath_subscription, dict):
@@ -143,6 +152,7 @@ class NXClient(Client):
                         arg_dict["mode"],
                         "SubscriptionMode",
                         proto.gnmi_pb2.SubscriptionMode,
+                        supported_sub_modes,
                     )
                 subscription = proto.gnmi_pb2.Subscription(**arg_dict)
             elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
@@ -152,10 +162,17 @@ class NXClient(Client):
             subscription_list.subscription.append(subscription)
         return self.subscribe([subscription_list])
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin="DME"):
-        """Origin defaults to DME paths
-        Otherwise specify "device" as origin
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """Origin defaults to YANG (device) paths
+        Otherwise specify "DME" as origin
         """
         if xpath.startswith("openconfig"):
-            raise NotImplementedError("OpenConfig data models not yet supported on NX-OS!")
+            raise NotImplementedError(
+                "OpenConfig data models not yet supported on NX-OS!"
+            )
+        if origin is None:
+            if any(map(xpath.startswith, ["Cisco-NX-OS-device", "ietf-interfaces"])):
+                origin = "device"
+            else:
+                origin = "DME"
         return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
