@@ -53,10 +53,10 @@ class NXClient(Client):
     >>> print(capabilities)
     """
 
-    def get(self, **kwds):
+    def get(self, *args, **kwargs):
         raise NotImplementedError("Get not yet supported on NX-OS!")
 
-    def set(self, **kwds):
+    def set(self, *args, **kwargs):
         raise NotImplementedError("Set not yet supported on NX-OS!")
 
     def subscribe_xpaths(
