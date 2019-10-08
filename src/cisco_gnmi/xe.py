@@ -222,7 +222,7 @@ class XEClient(Client):
         xpath_subscriptions,
         request_mode="STREAM",
         sub_mode="SAMPLE",
-        encoding="PROTO",
+        encoding="JSON_IETF",
         sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
@@ -246,7 +246,7 @@ class XEClient(Client):
             Indicates whether STREAM to stream from target,
             ONCE to stream once (like a get),
             POLL to respond to POLL.
-            [STREAM, ONCE, POLL]
+            [STREAM]
         sub_mode : proto.gnmi_pb2.SubscriptionMode, optional
             The default SubscriptionMode on a per Subscription basis in the SubscriptionList.
             TARGET_DEFINED indicates that the target (like device/destination) should stream
@@ -256,10 +256,10 @@ class XEClient(Client):
             desired behavior.
             ON_CHANGE only streams updates when changes occur.
             SAMPLE will stream the subscription at a regular cadence/interval.
-            [TARGET_DEFINED, ON_CHANGE, SAMPLE]
+            [SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
             A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
-            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
+            [JSON, JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
             Defaults to 10 seconds.
@@ -274,15 +274,23 @@ class XEClient(Client):
         -------
         subscribe()
         """
+        supported_request_modes = ["STREAM"]
+        supported_encodings = ["JSON", "JSON_IETF"]
+        supported_sub_modes = ["SAMPLE"]
         subscription_list = proto.gnmi_pb2.SubscriptionList()
         subscription_list.mode = util.validate_proto_enum(
             "mode",
             request_mode,
             "SubscriptionList.Mode",
             proto.gnmi_pb2.SubscriptionList.Mode,
+            supported_request_modes,
         )
         subscription_list.encoding = util.validate_proto_enum(
-            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
+            "encoding",
+            encoding,
+            "Encoding",
+            proto.gnmi_pb2.Encoding,
+            supported_encodings,
         )
         if isinstance(xpath_subscriptions, string_types):
             xpath_subscriptions = [xpath_subscriptions]
@@ -298,21 +306,16 @@ class XEClient(Client):
                     sub_mode,
                     "SubscriptionMode",
                     proto.gnmi_pb2.SubscriptionMode,
+                    supported_sub_modes,
                 )
                 subscription.sample_interval = sample_interval
-                subscription.suppress_redundant = suppress_redundant
-                if heartbeat_interval:
-                    subscription.heartbeat_interval = heartbeat_interval
             elif isinstance(xpath_subscription, dict):
                 path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
                 arg_dict = {
                     "path": path,
                     "mode": sub_mode,
                     "sample_interval": sample_interval,
-                    "suppress_redundant": suppress_redundant,
                 }
-                if heartbeat_interval:
-                    arg_dict["heartbeat_interval"] = heartbeat_interval
                 arg_dict.update(xpath_subscription)
                 if "mode" in arg_dict:
                     arg_dict["mode"] = util.validate_proto_enum(
@@ -320,6 +323,7 @@ class XEClient(Client):
                         arg_dict["mode"],
                         "SubscriptionMode",
                         proto.gnmi_pb2.SubscriptionMode,
+                        supported_sub_modes,
                     )
                 subscription = proto.gnmi_pb2.Subscription(**arg_dict)
             elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
@@ -330,15 +334,14 @@ class XEClient(Client):
         return self.subscribe([subscription_list])
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
-        """No origin specified implies openconfig
-        Otherwise origin is expected to be the module name
+        """Naievely tries to intelligently (non-sequitur!) origin
+        Otherwise assume rfc7951
+        legacy is not considered
         """
         if origin is None:
             # naive but effective
-            if xpath.startswith("openconfig") or ":" not in xpath:
-                # openconfig
-                origin = None
+            if ":" not in xpath:
+                origin = "openconfig"
             else:
-                # module name
-                origin = xpath.split(":")[0]
+                origin = "rfc7951"
         return super(XEClient, self).parse_xpath_to_gnmi_path(xpath, origin)
