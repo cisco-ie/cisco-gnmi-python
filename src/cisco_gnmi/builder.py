@@ -74,6 +74,8 @@ class ClientBuilder(object):
     >>> print(capabilities)
     """
 
+    os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient}
+
     def __init__(self, target):
         """Initializes the builder, most initialization is done via set_* methods.
         A target is always required, thus a member of the constructor.
@@ -119,11 +121,10 @@ class ClientBuilder(object):
         -------
         self
         """
-        os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient}
-        if name not in os_class_map.keys():
+        if name not in self.os_class_map.keys():
             raise Exception("OS not supported!")
         else:
-            self.__client_class = os_class_map[name]
+            self.__client_class = self.os_class_map[name]
         logging.debug("Using %s wrapper.", name or "Client")
         return self
 
@@ -183,6 +184,8 @@ class ClientBuilder(object):
     def set_secure_from_target(self):
         """Wraps set_secure(...) but loads root certificates from target.
         In effect, simply uses the target's certificate to create an encrypted channel.
+
+        TODO: This may not work with IOS XE and NX-OS, uncertain.
 
         Returns
         -------
