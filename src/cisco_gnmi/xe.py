@@ -52,9 +52,9 @@ class XEClient(Client):
     >>> client = ClientBuilder('127.0.0.1:9339').set_os(
     ...     'IOS XE'
     ... ).set_secure_from_file(
-    ...     'client.crt',
+    ...     'rootCA.pem',
     ...     'client.key',
-    ...     'rootCA.pem'
+    ...     'client.crt'
     ... ).set_ssl_target_override().set_call_authentication(
     ...     'admin',
     ...     'its_a_secret'
@@ -341,4 +341,4 @@ class XEClient(Client):
             else:
                 # module name
                 origin = xpath.split(":")[0]
-        return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(XEClient, self).parse_xpath_to_gnmi_path(xpath, origin)
