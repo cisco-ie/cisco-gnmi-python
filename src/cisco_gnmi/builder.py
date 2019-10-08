@@ -26,7 +26,7 @@ the License.
 import logging
 
 import grpc
-from . import Client, XRClient
+from . import Client, XRClient, NXClient
 from .auth import CiscoAuthPlugin
 from .util import gen_target_netloc, get_cert_from_target, get_cn_from_cert
 
@@ -74,6 +74,8 @@ class ClientBuilder(object):
     >>> print(capabilities)
     """
 
+    os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient}
+
     def __init__(self, target):
         """Initializes the builder, most initialization is done via set_* methods.
         A target is always required, thus a member of the constructor.
@@ -111,18 +113,18 @@ class ClientBuilder(object):
         ----------
         name : str
             "IOS XR" maps to the XRClient class.
+            "NX-OS" maps to the NXClient class.
             None maps to the base Client class which simply wraps the gNMI stub.
-            ["IOS XR", None]
+            ["IOS XR", "NX-OS", None]
         
         Returns
         -------
         self
         """
-        os_class_map = {None: Client, "IOS XR": XRClient}
-        if name not in os_class_map.keys():
+        if name not in self.os_class_map.keys():
             raise Exception("OS not supported!")
         else:
-            self.__client_class = os_class_map[name]
+            self.__client_class = self.os_class_map[name]
         logging.debug("Using %s wrapper.", name or "Client")
         return self
 
@@ -182,6 +184,8 @@ class ClientBuilder(object):
     def set_secure_from_target(self):
         """Wraps set_secure(...) but loads root certificates from target.
         In effect, simply uses the target's certificate to create an encrypted channel.
+
+        TODO: This may not work with IOS XE and NX-OS, uncertain.
 
         Returns
         -------
