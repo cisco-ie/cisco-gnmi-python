@@ -74,7 +74,12 @@ class ClientBuilder(object):
     >>> print(capabilities)
     """
 
-    os_class_map = {None: Client, "IOS XR": XRClient, "NX-OS": NXClient, "IOS XE": XEClient}
+    os_class_map = {
+        None: Client,
+        "IOS XR": XRClient,
+        "NX-OS": NXClient,
+        "IOS XE": XEClient,
+    }
 
     def __init__(self, target):
         """Initializes the builder, most initialization is done via set_* methods.

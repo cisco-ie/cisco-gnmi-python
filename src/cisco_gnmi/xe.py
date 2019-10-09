@@ -32,6 +32,7 @@ from .client import Client, proto, util
 
 class XEClient(Client):
     """IOS XE-specific wrapper for gNMI functionality.
+    Assumes IOS XE 16.12+
 
     Returns direct responses from base Client methods.
 
@@ -62,17 +63,17 @@ class XEClient(Client):
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     ...
-    >>> get_response = client.get_xpaths('interfaces/interface')
+    >>> get_response = client.get_xpaths('/interfaces/interface')
     >>> print(get_response)
     ...
-    >>> subscribe_response = client.subscribe_xpaths('interfaces/interface')
+    >>> subscribe_response = client.subscribe_xpaths('/interfaces/interface')
     >>> for message in subscribe_response: print(message)
     ...
-    >>> config = '{"Cisco-IOS-XR-shellutil-cfg:host-names": [{"host-name": "gnmi_test"}]}'
+    >>> config = '{"Cisco-IOS-XE-native:native": {"hostname": "gnmi_test"}}'
     >>> set_response = client.set_json(config)
     >>> print(set_response)
     ...
-    >>> delete_response = client.delete_xpaths('Cisco-IOS-XR-shellutil-cfg:host-names/host-name')
+    >>> delete_response = client.delete_xpaths('/Cisco-IOS-XE-native:native/hostname')
     """
 
     def delete_xpaths(self, xpaths, prefix=None):
@@ -200,12 +201,20 @@ class XEClient(Client):
             [ALL, CONFIG, STATE, OPERATIONAL]
         encoding : proto.gnmi_pb2.GetRequest.Encoding, optional
             A direct value or key from the Encoding enum
-            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
+            [JSON, JSON_IETF]
 
         Returns
         -------
         get()
         """
+        supported_encodings = ["JSON", "JSON_IETF"]
+        encoding = util.validate_proto_enum(
+            "encoding",
+            encoding,
+            "Encoding",
+            proto.gnmi_pb2.Encoding,
+            supported_encodings,
+        )
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
             gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
@@ -220,11 +229,8 @@ class XEClient(Client):
     def subscribe_xpaths(
         self,
         xpath_subscriptions,
-        request_mode="STREAM",
-        sub_mode="SAMPLE",
         encoding="JSON_IETF",
         sample_interval=Client._NS_IN_S * 10,
-        suppress_redundant=False,
         heartbeat_interval=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
@@ -242,29 +248,12 @@ class XEClient(Client):
             to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
             dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
             treated as simply a pre-made Subscription.
-        request_mode : proto.gnmi_pb2.SubscriptionList.Mode, optional
-            Indicates whether STREAM to stream from target,
-            ONCE to stream once (like a get),
-            POLL to respond to POLL.
-            [STREAM]
-        sub_mode : proto.gnmi_pb2.SubscriptionMode, optional
-            The default SubscriptionMode on a per Subscription basis in the SubscriptionList.
-            TARGET_DEFINED indicates that the target (like device/destination) should stream
-            information however it knows best. This instructs the target to decide between ON_CHANGE
-            or SAMPLE - e.g. the device gNMI server may understand that we only need RIB updates
-            as an ON_CHANGE basis as opposed to SAMPLE, and we don't have to explicitly state our
-            desired behavior.
-            ON_CHANGE only streams updates when changes occur.
-            SAMPLE will stream the subscription at a regular cadence/interval.
-            [SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
             A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
             [JSON, JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
             Defaults to 10 seconds.
-        suppress_redundant : bool, optional
-            Indicates whether values that have not changed should be sent in a SAMPLE subscription.
         heartbeat_interval : int, optional
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
@@ -274,9 +263,9 @@ class XEClient(Client):
         -------
         subscribe()
         """
-        supported_request_modes = ["STREAM"]
+        request_mode = "STREAM"
         supported_encodings = ["JSON", "JSON_IETF"]
-        supported_sub_modes = ["SAMPLE"]
+        sub_mode = "SAMPLE"
         subscription_list = proto.gnmi_pb2.SubscriptionList()
         subscription_list.mode = util.validate_proto_enum(
             "mode",
