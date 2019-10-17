@@ -1,7 +1,7 @@
 import pytest
+from pytest_mock import mocker
 from src.cisco_gnmi import util
-from urllib.parse import urlparse
-import ssl
+from src.cisco_gnmi.util import urlparse, ssl, x509, default_backend
 
 
 def test_gen_target_netloc_valueerror():
@@ -44,3 +44,14 @@ def test_get_cert_from_target():
     result = util.get_cert_from_target((target)).decode('utf-8')
 
     assert expected_ssl_cert == result
+
+def test_get_cn_from_cert_retrun_value_one(mocker):
+
+    mock_cert_parsed = mocker.patch.object(x509, 'load_pem_x509_certificate')
+    result = util.get_cn_from_cert([])
+
+    assert None == result
+
+def test_get_cn_from_cert_retrun_value_two(mocker):
+    pass
+

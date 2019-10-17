@@ -13,9 +13,9 @@ install:
 
 .PHONY: test
 test: clean
-	pytest $(TEST_DIR) -v
+	pytest $(TEST_DIR) -v --disable-warnings
 
 .PHONY: open-report
 open-report:
-	pytest --cov=src/ --cov-report=term-missing --cov-report=html
+	pytest --cov=src/ --cov-report=term-missing --cov-report=html --disable-warnings
 	open htmlcov/index.html || xdg-open htmlcov/index.html
