@@ -1,6 +1,6 @@
 # Tests
 
-> You should've clone this project/repo, if not run the below command in your terminal:
+> You should've cloned this project/repo, if not run the below command in your terminal:
 ```
 git clone git@github.com:cisco-ie/cisco-gnmi-python.git
 ```

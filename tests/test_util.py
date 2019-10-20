@@ -56,14 +56,14 @@ def test_validate_proto_enum_element_in_subset_two():
     result = util.validate_proto_enum('test', 'TARGET_DEFINED', 'test', enum, subset=fake_subset)
     assert 0 == result
 
-def test_validate_proto_enum_value_return_one():
+def test_validate_proto_enum_value_returned_one():
 
     enum = gnmi_pb2.SubscriptionMode
 
     result = util.validate_proto_enum('test', 'ON_CHANGE', 'test', enum)
     assert 1 == result
 
-def test_validate_proto_enum_value_return_two():
+def test_validate_proto_enum_value_returned_two():
     
     enum = gnmi_pb2.SubscriptionMode
 
@@ -89,9 +89,12 @@ def test_get_cert_from_target():
 
     assert expected_ssl_cert == result
 
-def test_get_cn_from_cert_retrun_value_one(mocker):
-    pass
+def test_get_cn_from_cert_retruned_value_invalid_entry(mocker):
 
-def test_get_cn_from_cert_retrun_value_two(mocker):
-    pass
+    mock_cert_parsed = mocker.patch.object(x509, 'load_pem_x509_certificate')
+    result = util.get_cn_from_cert('INVALID_ENTRY')
 
+    assert None == result
+
+def test_get_cn_from_cert_retruned_value(mocker):
+    pass
