@@ -18,17 +18,43 @@ def test_gen_target_netloc_parsed_none():
     assert mock_parsed_netloc == result
 
 def test_validate_proto_enum_exception_one():
-    
+
     enum = gnmi_pb2.SubscriptionMode
 
     with pytest.raises(Exception):
         util.validate_proto_enum('test', 'INVALID_VALUE', 'test', enum)
 
 def test_validate_proto_enum_exception_two():
-    pass
+
+    enum = gnmi_pb2.SubscriptionMode
+    fake_subset = [3]
+
+    with pytest.raises(Exception):
+        util.validate_proto_enum('test', 2, 'test', enum, subset=fake_subset)
 
 def test_validate_proto_enum_exception_three():
-    pass
+    
+    enum = gnmi_pb2.SubscriptionMode
+    fake_subset = ["ON_CHANGE", "SAMPLE"]
+
+    with pytest.raises(Exception):
+        util.validate_proto_enum('test', 'TARGET_DEFINED', 'test', enum, subset=fake_subset)
+
+def test_validate_proto_enum_element_in_subset_one():
+
+    enum = gnmi_pb2.SubscriptionMode
+    fake_subset = ["ON_CHANGE", "SAMPLE"]
+
+    result = util.validate_proto_enum('test', 2, 'test', enum, subset=fake_subset)
+    assert 2 == result
+
+def test_validate_proto_enum_element_in_subset_two():
+    
+    enum = gnmi_pb2.SubscriptionMode
+    fake_subset = [2, 0]
+
+    result = util.validate_proto_enum('test', 'TARGET_DEFINED', 'test', enum, subset=fake_subset)
+    assert 0 == result
 
 def test_validate_proto_enum_value_return_one():
 

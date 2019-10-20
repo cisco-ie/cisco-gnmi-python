@@ -13,7 +13,7 @@ install:
 
 .PHONY: test
 test: clean
-	pytest $(TEST_DIR) -v --disable-warnings
+	pytest $(TEST_DIR) -v -s --disable-warnings
 
 .PHONY: open-report
 open-report:
