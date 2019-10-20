@@ -5,6 +5,11 @@ TEST_DIR=tests
 clean:
 	rm -rf .coverage htmlcov/
 
+.PHONY: create-env
+create-env:
+	python3 -m venv cisco_gnmi
+	echo "Run => 'source cisco_gnmi/bin/activate' "
+
 .PHONY: install
 install:
 	pip install --upgrade pip
