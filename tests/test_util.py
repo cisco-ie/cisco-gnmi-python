@@ -30,13 +30,19 @@ def test_validate_proto_enum_exception_two():
 def test_validate_proto_enum_exception_three():
     pass
 
-def test_validate_proto_enum_value_return():
-    
+def test_validate_proto_enum_value_return_one():
+
     enum = gnmi_pb2.SubscriptionMode
 
     result = util.validate_proto_enum('test', 'ON_CHANGE', 'test', enum)
     assert 1 == result
 
+def test_validate_proto_enum_value_return_two():
+    
+    enum = gnmi_pb2.SubscriptionMode
+
+    result = util.validate_proto_enum('test', 1, 'test', enum)
+    assert 1 == result
 
 def test_get_cert_from_target():
 
