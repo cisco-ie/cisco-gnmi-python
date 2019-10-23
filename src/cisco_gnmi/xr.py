@@ -338,5 +338,5 @@ class XRClient(Client):
                 origin = None
             else:
                 # module name
-                origin = xpath.split(":")[0]
+                origin, xpath = xpath.split(":", 1)
         return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
