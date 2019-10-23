@@ -73,7 +73,7 @@ def test_validate_proto_enum_value_returned_two():
 def test_get_cert_from_target():
 
     target_netloc = {
-        "hostname": "172.217.15.100",
+        "hostname": "cisco.com",
         "port": 443
     }
     
@@ -84,17 +84,17 @@ def test_get_cert_from_target():
     
     expected_ssl_cert.encode('utf-8')
       
-    target = util.gen_target_netloc("172.217.15.100:443")
+    target = util.gen_target_netloc("cisco.com:443")
     result = util.get_cert_from_target((target)).decode('utf-8')
 
     assert expected_ssl_cert == result
 
-def test_get_cn_from_cert_retruned_value_invalid_entry(mocker):
+def test_get_cn_from_cert_returned_value_invalid_entry(mocker):
 
     mock_cert_parsed = mocker.patch.object(x509, 'load_pem_x509_certificate')
     result = util.get_cn_from_cert('INVALID_ENTRY')
 
     assert None == result
 
-def test_get_cn_from_cert_retruned_value(mocker):
+def test_get_cn_from_cert_returned_value(mocker):
     pass

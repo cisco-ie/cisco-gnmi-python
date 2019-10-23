@@ -86,7 +86,6 @@ celerybeat-schedule
 *.sage.py
 
 # Environments
-cisco_gnmi/
 .env
 .venv
 env/

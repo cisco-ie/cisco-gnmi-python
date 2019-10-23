@@ -1,4 +1,3 @@
-SOURCE=src/cisco_gnmi
 TEST_DIR=tests
 
 .PHONY: clean
@@ -7,13 +6,12 @@ clean:
 
 .PHONY: create-env
 create-env:
-	python3 -m venv cisco_gnmi
-	echo "Run => 'source cisco_gnmi/bin/activate' "
+	python3 -m venv env || python -m venv env
+	echo "Run => 'source env/bin/activate' "
 
 .PHONY: install
 install:
 	pip install --upgrade pip
-	pip install -r $(TEST_DIR)/requirements.txt
 	pip install .
 
 .PHONY: test

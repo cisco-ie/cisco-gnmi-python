@@ -54,6 +54,10 @@ setup(
         "protobuf",
         "six",
         "cryptography",
+        "pytest",
+        "pytest-cov",
+        "pytest-mock",
+        "coverage"
     ],
     extras_require={
         "dev": [
