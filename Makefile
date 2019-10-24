@@ -21,6 +21,29 @@ coverage:
 	pytest --cov=src/ --cov-report=term-missing --cov-report=html --disable-warnings
 	open htmlcov/index.html || xdg-open htmlcov/index.html
 
+## Packages for both Python 2 and 3 for PyPi.
+.PHONY: packaging
+packaging:
+	pipenv --rm
+	rm Pipfile.lock
+	pipenv --three install --dev
+	pipenv run python setup.py sdist bdist_wheel
+	pipenv --rm
+	rm Pipfile.lock
+	pipenv --two install --dev
+	pipenv run python setup.py sdist bdist_wheel
+	pipenv --rm
+	rm Pipfile.lock
+
+## Uploads packages to PyPi.
+.PHONY: upload
+upload:
+	pipenv run twine upload dist/*
+
+## Alias for packaging and upload together.
+.PHONY: pypi
+pypi: packaging upload setup
+
 .DEFAULT:
 	@$(MAKE) help
 
