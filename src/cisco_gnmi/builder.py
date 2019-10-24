@@ -225,16 +225,7 @@ class ClientBuilder(object):
         -------
         self
         """
-        if ssl_target_name_override is None:
-            if not self.__root_certificates:
-                raise Exception("Deriving override requires root certificate!")
-            ssl_target_name_override = get_cn_from_cert(self.__root_certificates)
-            logging.warning(
-                "Overriding SSL option from certificate could increase MITM susceptibility!"
-            )
-        self.set_channel_option(
-            "grpc.ssl_target_name_override", ssl_target_name_override
-        )
+        self.__ssl_target_name_override = ssl_target_name_override
         return self
 
     def set_channel_option(self, name, value):
@@ -296,6 +287,17 @@ class ClientBuilder(object):
         else:
             channel_creds = channel_ssl_creds
             logging.debug("Using SSL credentials, no metadata authentication.")
+        if self.__ssl_target_name_override is not False:
+            if self.__ssl_target_name_override is None:
+                if not self.__root_certificates:
+                    raise Exception("Deriving override requires root certificate!")
+                self.__ssl_target_name_override = get_cn_from_cert(self.__root_certificates)
+                logging.warning(
+                    "Overriding SSL option from certificate could increase MITM susceptibility!"
+                )
+            self.set_channel_option(
+                "grpc.ssl_target_name_override", self.__ssl_target_name_override
+            )
         channel = grpc.secure_channel(
             self.__target_netloc.netloc, channel_creds, self.__channel_options
         )
@@ -320,4 +322,5 @@ class ClientBuilder(object):
         self.__username = None
         self.__password = None
         self.__channel_options = None
+        self.__ssl_target_name_override = False
         return self
