@@ -248,9 +248,11 @@ class XEClient(Client):
         -------
         subscribe()
         """
+        supported_request_modes = ["STREAM"]
         request_mode = "STREAM"
-        supported_encodings = ["JSON", "JSON_IETF"]
+        supported_sub_modes = ["SAMPLE"]
         sub_mode = "SAMPLE"
+        supported_encodings = ["JSON", "JSON_IETF"]
         subscription_list = proto.gnmi_pb2.SubscriptionList()
         subscription_list.mode = util.validate_proto_enum(
             "mode",
