@@ -16,6 +16,10 @@ grpcio = "*"
 protobuf = "*"
 six = "*"
 cryptography = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-mock = "*"
+pytest-coverage = "*"
 
 [requires]
 python_version = "3.6"

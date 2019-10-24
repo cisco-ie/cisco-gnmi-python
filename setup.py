@@ -63,6 +63,10 @@ setup(
             "twine",
             "setuptools",
             "wheel",
+            "pytest",
+            "pytest-cov",
+            "pytest-mock",
+            "coverage",
         ],
     },
 )

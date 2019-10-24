@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Script which autoformats (black) and lints (pylint) code
 echo "Running black ..."
-FORMAT_COMMAND="black --safe --verbose --exclude proto src/cisco_gnmi"
+FORMAT_COMMAND="black --safe --verbose --exclude proto src/cisco_gnmi tests/"
 if black &> /dev/null; then
     eval $FORMAT_COMMAND
 elif pipenv run black &> /dev/null; then
