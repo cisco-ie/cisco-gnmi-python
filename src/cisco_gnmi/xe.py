@@ -159,24 +159,9 @@ class XEClient(Client):
                 if len(config.keys()) > 1:
                     raise Exception("config should only target one YANG module!")
                 top_element = next(iter(config.keys()))
-                top_element_split = top_element.split(":")
-                if len(top_element_split) < 2:
-                    raise Exception(
-                        "Top level config element {} should be module prefixed!".format(
-                            top_element
-                        )
-                    )
-                if len(top_element_split) > 2:
-                    raise Exception(
-                        "Top level config element {} appears malformed!".format(
-                            top_element
-                        )
-                    )
-                origin = top_element_split[0]
-                element = top_element_split[1]
-                config = config.pop(top_element)
                 update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(element, origin))
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
+                config = config.pop(top_element)
                 if ietf:
                     update.val.json_ietf_val = json.dumps(config).encode("utf-8")
                 else:

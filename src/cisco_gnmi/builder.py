@@ -119,8 +119,9 @@ class ClientBuilder(object):
         name : str
             "IOS XR" maps to the XRClient class.
             "NX-OS" maps to the NXClient class.
+            "IOS XE" maps to the XEClient class.
             None maps to the base Client class which simply wraps the gNMI stub.
-            ["IOS XR", "NX-OS", None]
+            ["IOS XR", "NX-OS", "IOS XE", None]
         
         Returns
         -------
@@ -273,7 +274,7 @@ class ClientBuilder(object):
 
         Returns
         -------
-        Client or XRClient
+        Client or NXClient or XEClient or XRClient
         """
         channel = None
         channel_ssl_creds = None
