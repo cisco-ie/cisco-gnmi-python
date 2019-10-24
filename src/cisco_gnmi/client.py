@@ -116,8 +116,8 @@ class Client(object):
         self,
         paths,
         prefix=None,
-        data_type=proto.gnmi_pb2.GetRequest.DataType.ALL,
-        encoding=proto.gnmi_pb2.Encoding.JSON_IETF,
+        data_type="ALL",
+        encoding="JSON_IETF",
         use_models=None,
         extension=None,
     ):
