@@ -144,11 +144,13 @@ git clone https://github.com/cisco-ie/cisco-gnmi-python.git
 cd cisco-gnmi-python
 # If pipenv not installed, install!
 pip install --user pipenv
-# Now use pipenv
+# Now use Makefile...
+make setup
+# Or pipenv manually if make not present
 pipenv --three install --dev
 # Enter virtual environment
 pipenv shell
-# Do your thing.
+# Work work
 exit
 ```
 
