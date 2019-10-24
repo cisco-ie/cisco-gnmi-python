@@ -310,7 +310,7 @@ class XEClient(Client):
         return self.subscribe([subscription_list])
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
-        """Naievely tries to intelligently (non-sequitur!) origin
+        """Naively tries to intelligently (non-sequitur!) origin
         Otherwise assume rfc7951
         legacy is not considered
         """
