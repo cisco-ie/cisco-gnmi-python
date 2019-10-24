@@ -8,7 +8,7 @@ setup:
 ## Cleans test and packaging outputs.
 .PHONY: clean
 clean:
-	rm -rf .coverage build/ dist/
+	rm -rf .coverage htmlcov/ build/ dist/
 
 ## Runs tests.
 .PHONY: test
@@ -18,7 +18,8 @@ test: clean
 ## Creates coverage report.
 .PHONY: coverage
 coverage:
-	pipenv run pytest --cov=src/ --cov-report=term-missing --disable-warnings
+	pytest --cov=src/ --cov-report=term-missing --cov-report=html --disable-warnings
+	open htmlcov/index.html || xdg-open htmlcov/index.html
 
 .DEFAULT:
 	@$(MAKE) help
