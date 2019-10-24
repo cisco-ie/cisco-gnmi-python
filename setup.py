@@ -54,10 +54,6 @@ setup(
         "protobuf",
         "six",
         "cryptography",
-        "pytest",
-        "pytest-cov",
-        "pytest-mock",
-        "coverage"
     ],
     extras_require={
         "dev": [
@@ -67,6 +63,10 @@ setup(
             "twine",
             "setuptools",
             "wheel",
+            "pytest",
+            "pytest-cov",
+            "pytest-mock",
+            "coverage",
         ],
     },
 )
