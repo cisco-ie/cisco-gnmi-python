@@ -109,7 +109,7 @@ from cisco_gnmi import ClientBuilder
 
 client = ClientBuilder(
     '127.0.0.1:9339'
-).set_os('IOS XR').set_secure_from_file(
+).set_os('IOS XE').set_secure_from_file(
     root_certificates='rootCA.pem',
     private_key='client.key',
     certificate_chain='client.crt',
@@ -125,10 +125,20 @@ client = ClientBuilder(
 
 Methods are documented in [`src/cisco_gnmi/client.py`](src/cisco_gnmi/client.py).
 
-### XRClient
-`XRClient` inherets from `Client` and provides several wrapper methods which aid with IOS XR-specific behaviors of the gNMI implementation. These are `delete_xpaths`, `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods make several assumptions about what kind of information will be supplied to them in order to simplify usage of the gNMI RPCs, detailed in the documentation.
+### NXClient
+`NXClient` inherits from `Client` and provides several wrapper methods which aid with NX-OS gNMI implementation usage. These are `subscribe_xpaths`, and the removal of `get` and `set` as they are not yet supported operations. These methods have some helpers and constraints around what is supported by the implementation.
 
-Methods are documented in [`src/cisco_gnmi/xr.py`](src/cisco_gnmi/xr.py).
+Methods and usage examples are documented in [`src/cisco_gnmi/nx.py`](src/cisco_gnmi/nx.py).
+
+### XEClient
+`XEClient` inherits from `Client` and provides several wrapper methods which aid with IOS XE gNMI implementation usage. These are `delete_xpaths`, `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods have some helpers and constraints around what is supported by the implementation.
+
+Methods and usage examples are documented in [`src/cisco_gnmi/xe.py`](src/cisco_gnmi/xe.py).
+
+### XRClient
+`XRClient` inherits from `Client` and provides several wrapper methods which aid with IOS XR gNMI implementation usage. These are `delete_xpaths`, `get_xpaths`, `set_json`, and `subscribe_xpaths`. These methods have some helpers and constraints around what is supported by the implementation.
+
+Methods and usage examples are documented in [`src/cisco_gnmi/xr.py`](src/cisco_gnmi/xr.py).
 
 ## gNMI
 gRPC Network Management Interface (gNMI) is a service defining an interface for a network management system (NMS) to interact with a network element. It may be thought of as akin to NETCONF or other control protocols which define operations and behaviors. The scope of gNMI is relatively simple - it seeks to "[[define](https://github.com/openconfig/reference/blob/master/rpc/gnmi/gnmi-specification.md)] a gRPC-based protocol for the modification and retrieval of configuration from a target device, as well as the control and generation of telemetry streams from a target device to a data collection system. The intention is that a single gRPC service definition can cover both configuration and telemetry - allowing a single implementation on the target, as well as a single NMS element to interact with the device via telemetry and configuration RPCs".
