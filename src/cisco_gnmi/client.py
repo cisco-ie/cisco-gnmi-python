@@ -154,8 +154,7 @@ class Client(object):
         request = proto.gnmi_pb2.GetRequest()
         if not isinstance(paths, (list, set)):
             raise Exception("paths must be an iterable containing Path(s)!")
-        for path in paths:
-            request.path.append(path)
+        request.path.extend(paths)
         request.type = data_type
         request.encoding = encoding
         if prefix:
@@ -201,17 +200,13 @@ class Client(object):
             if not isinstance(item, (list, set)):
                 raise Exception("updates, replaces, and deletes must be iterables!")
         if updates:
-            for update in updates:
-                request.update.append(update)
+            request.update.extend(updates)
         if replaces:
-            for update in replaces:
-                request.replace.append(update)
+            request.replaces.extend(replaces)
         if deletes:
-            for path in deletes:
-                request.delete.append(path)
+            request.delete.extend(deletes)
         if extensions:
-            for extension in extensions:
-                request.extension.append(extension)
+            request.extension.extend(extensions)
         response = self.service.Set(request)
         return response
 
@@ -248,8 +243,7 @@ class Client(object):
                     "request must be a SubscriptionList, Poll, or AliasList!"
                 )
             if extensions:
-                for extension in extensions:
-                    subscribe_request.extensions.append(extension)
+                subscribe_request.extensions.extend(extensions)
             return subscribe_request
 
         response_stream = self.service.Subscribe(
@@ -280,6 +274,7 @@ class Client(object):
         # TODO: Lazy
         xpath = xpath.strip("/")
         xpath_elements = xpath_tokenizer_re.findall(xpath)
+        path_elems = []
         for index, element in enumerate(xpath_elements):
             # stripped initial /, so this indicates a completed element
             if element[0] == "/":
@@ -287,7 +282,7 @@ class Client(object):
                     raise Exception(
                         "Current PathElem has no name yet is trying to be pushed to path! Invalid XPath?"
                     )
-                path.elem.append(curr_elem)
+                path_elems.append(curr_elem)
                 curr_elem = proto.gnmi_pb2.PathElem()
                 continue
             # We are entering a filter
@@ -333,8 +328,9 @@ class Client(object):
         # If we have a dangling element that hasn't been completed due to no
         # / element then let's just append the final element.
         if curr_elem:
-            path.elem.append(curr_elem)
+            path_elems.append(curr_elem)
             curr_elem = None
         if any([curr_elem, curr_key, in_filter]):
             raise Exception("Unfinished elements in XPath parsing!")
+        path.elem.extend(path_elems)
         return path

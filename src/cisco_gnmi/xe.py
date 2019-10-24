@@ -270,6 +270,7 @@ class XEClient(Client):
         )
         if isinstance(xpath_subscriptions, string_types):
             xpath_subscriptions = [xpath_subscriptions]
+        subscriptions = []
         for xpath_subscription in xpath_subscriptions:
             subscription = None
             if isinstance(xpath_subscription, string_types):
@@ -306,7 +307,8 @@ class XEClient(Client):
                 subscription = xpath_subscription
             else:
                 raise Exception("xpath in list must be xpath or dict/Path!")
-            subscription_list.subscription.append(subscription)
+            subscriptions.append(subscription)
+        subscription_list.subscription.extend(subscriptions)
         return self.subscribe([subscription_list])
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
