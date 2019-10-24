@@ -10,5 +10,7 @@ def test_call():
     mock_call = mock.MagicMock(spec=CiscoAuthPlugin.__call__)
 
     instance = CiscoAuthPlugin(username, password)
-    result = instance.__call__([(username, "testUsr"), (password, "testPass")], CiscoAuthPlugin)
+    result = instance.__call__(
+        [(username, "testUsr"), (password, "testPass")], CiscoAuthPlugin
+    )
     mock_call.assert_not_called()
