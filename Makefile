@@ -1,28 +1,55 @@
 TEST_DIR=tests
+#PYPI_URL=https://test.pypi.org/legacy/
+PYPI_URL=https://upload.pypi.org/legacy/
+DEFAULT_PYTHON_VERSION=three
 
 ## Sets up the virtual environment via pipenv.
 .PHONY: setup
 setup:
-	pipenv --three install --dev
+	pipenv --$(DEFAULT_PYTHON_VERSION) install --dev
 
-## Cleans test and packaging outputs.
+## Removes everything including virtual environments.
 .PHONY: clean
-clean:
-	rm -rf .coverage htmlcov/ build/ dist/
+clean: mostlyclean
+	-pipenv --rm
+	rm -f Pipfile.lock
+
+## Removes test and packaging outputs.
+.PHONY: mostlyclean
+mostlyclean:
+	rm -rf .coverage htmlcov/ .pytest_cache/ build/ dist/
 
 ## Runs tests.
 .PHONY: test
-test: clean
+test:
 	pipenv run pytest $(TEST_DIR) -v -s --disable-warnings
 
 ## Creates coverage report.
 .PHONY: coverage
 coverage:
-	pytest --cov=src/ --cov-report=term-missing --cov-report=html --disable-warnings
+	pipenv run pytest --cov=src/ --cov-report=term-missing --cov-report=html --disable-warnings
 	open htmlcov/index.html || xdg-open htmlcov/index.html
 
-.DEFAULT:
-	@$(MAKE) help
+## Packages for both Python 2 and 3 for PyPi.
+.PHONY: dist
+dist: mostlyclean
+	-pipenv --rm
+	pipenv --three install --dev --skip-lock
+	pipenv run python setup.py sdist bdist_wheel
+	pipenv --rm
+	pipenv --two install --dev --skip-lock
+	pipenv run python setup.py sdist bdist_wheel
+	pipenv --rm
+	pipenv --$(DEFAULT_PYTHON_VERSION) install --dev
+
+## Uploads packages to PyPi.
+.PHONY: upload
+upload:
+	pipenv run twine upload --repository-url $(PYPI_URL) dist/*
+
+## Alias for packaging and upload together.
+.PHONY: pypi
+pypi: dist upload
 
 ## This help message.
 .PHONY: help
