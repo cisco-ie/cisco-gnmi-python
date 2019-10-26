@@ -291,7 +291,9 @@ class ClientBuilder(object):
             if self.__ssl_target_name_override is None:
                 if not self.__root_certificates:
                     raise Exception("Deriving override requires root certificate!")
-                self.__ssl_target_name_override = get_cn_from_cert(self.__root_certificates)
+                self.__ssl_target_name_override = get_cn_from_cert(
+                    self.__root_certificates
+                )
                 logging.warning(
                     "Overriding SSL option from certificate could increase MITM susceptibility!"
                 )
