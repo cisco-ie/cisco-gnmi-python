@@ -342,3 +342,42 @@ class XRClient(Client):
                 # module name
                 origin, xpath = xpath.split(":", 1)
         return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+
+    def get_cli_commands(self, cli_commands):
+        """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied CLI commands.
+
+        Parameters
+        ----------
+        cli_commands : iterable of str or str
+            An iterable of CLI commands as strings to request data of
+            If simply a str, wraps as a list for convenience
+
+        Returns
+        -------
+        get()
+        """
+        gnmi_path = None
+        if isinstance(cli_commands, (list, set)):
+            gnmi_path = map(self.parse_cli_command_to_gnmi_path, set(cli_commands))
+        elif isinstance(cli_commands, string_types):
+            gnmi_path = [self.parse_cli_command_to_gnmi_path(cli_commands)]
+        else:
+            raise Exception(
+                "cli_commands must be a single CLI command string or iterable of CLI commands as strings!"
+            )
+        return self.get(gnmi_path, encoding='ASCII')
+
+    def parse_cli_command_to_gnmi_path(self, cli_command):
+        """A convenience wrapper for parse_cli_command_to_gnmi_path() that creates the proto.gnmi_pb2.Path for the
+        supplied CLI command.
+
+        Parameters
+        ----------
+        cli_command : str
+            A CLI command as str
+
+        Returns
+        -------
+        parse_cli_command_to_gnmi_path()
+        """
+        return super(XRClient, self).parse_cli_command_to_gnmi_path(cli_command)
