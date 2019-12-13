@@ -367,17 +367,3 @@ class XRClient(Client):
             )
         return self.get(gnmi_path, encoding='ASCII')
 
-    def parse_cli_command_to_gnmi_path(self, cli_command):
-        """A convenience wrapper for parse_cli_command_to_gnmi_path() that creates the proto.gnmi_pb2.Path for the
-        supplied CLI command.
-
-        Parameters
-        ----------
-        cli_command : str
-            A CLI command as str
-
-        Returns
-        -------
-        parse_cli_command_to_gnmi_path()
-        """
-        return super(XRClient, self).parse_cli_command_to_gnmi_path(cli_command)
