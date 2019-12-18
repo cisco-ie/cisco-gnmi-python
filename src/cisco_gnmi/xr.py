@@ -367,3 +367,19 @@ class XRClient(Client):
             )
         return self.get(gnmi_path, encoding='ASCII')
 
+    def parse_cli_command_to_gnmi_path(self, cli_command):
+        """Parses a CLI command to proto.gnmi_pb2.Path.
+        This function should be overridden by any child classes for origin logic.
+
+        The CLI command becomes a path element.
+        """
+        if not isinstance(cli_command, string_types):
+            raise Exception("cli_command must be a string!")
+
+        path = proto.gnmi_pb2.Path()
+        curr_elem = proto.gnmi_pb2.PathElem()
+        curr_elem.name = cli_command
+        path.elem.extend([curr_elem])
+
+        return path
+
