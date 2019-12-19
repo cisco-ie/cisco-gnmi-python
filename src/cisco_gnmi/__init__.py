@@ -30,4 +30,4 @@ from .nx import NXClient
 from .xe import XEClient
 from .builder import ClientBuilder
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
