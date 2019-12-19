@@ -215,6 +215,31 @@ class XRClient(Client):
             )
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
+    def get_cli(self, commands):
+        """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied CLI commands.
+        IOS XR appears to be the only OS with this functionality.
+
+        Parameters
+        ----------
+        commands : iterable of str or str
+            An iterable of CLI commands as strings to request data of
+            If simply a str, wraps as a list for convenience
+
+        Returns
+        -------
+        get()
+        """
+        gnmi_path = None
+        if isinstance(commands, (list, set)):
+            gnmi_path = list(map(self.parse_cli_to_gnmi_path, commands))
+        elif isinstance(commands, string_types):
+            gnmi_path = [self.parse_cli_to_gnmi_path(commands)]
+        else:
+            raise Exception(
+                "commands must be a single CLI command string or iterable of CLI commands as strings!"
+            )
+        return self.get(gnmi_path, encoding="ASCII")
+
     def subscribe_xpaths(
         self,
         xpath_subscriptions,
@@ -342,3 +367,17 @@ class XRClient(Client):
                 # module name
                 origin, xpath = xpath.split(":", 1)
         return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+
+    def parse_cli_to_gnmi_path(self, command):
+        """Parses a CLI command to proto.gnmi_pb2.Path.
+        IOS XR appears to be the only OS with this functionality.
+
+        The CLI command becomes a path element.
+        """
+        if not isinstance(command, string_types):
+            raise Exception("command must be a string!")
+        path = proto.gnmi_pb2.Path()
+        curr_elem = proto.gnmi_pb2.PathElem()
+        curr_elem.name = command
+        path.elem.extend([curr_elem])
+        return path
