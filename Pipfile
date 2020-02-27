@@ -10,6 +10,7 @@ pylint = "*"
 twine = "*"
 setuptools = "*"
 wheel = "*"
+sphinx = "*"
 
 [packages]
 grpcio = "*"
