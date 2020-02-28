@@ -24,6 +24,7 @@ the License.
 """Python gNMI wrapper to ease usage of gNMI."""
 
 import logging
+from collections import OrderedDict
 from xml.etree.ElementPath import xpath_tokenizer_re
 from six import string_types
 
@@ -152,7 +153,9 @@ class Client(object):
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         request = proto.gnmi_pb2.GetRequest()
-        if not isinstance(paths, (list, set)):
+        try:
+            iter(paths)
+        except TypeError:
             raise Exception("paths must be an iterable containing Path(s)!")
         request.path.extend(paths)
         request.type = data_type
@@ -334,3 +337,79 @@ class Client(object):
             raise Exception("Unfinished elements in XPath parsing!")
         path.elem.extend(path_elems)
         return path
+
+    def xpath_iterator(self, xpath):
+        for token in xpath[1:].split('/'):
+            #elem = proto.gnmi_pb2.PathElem()
+            xpath_so_far += '/' + token
+            if '[' in token:
+                keys = OrderedDict()
+                subtoken = token.replace('[', ',').replace(']', '').split(',')
+                for k in subtoken:
+                    if '=' not in k:
+                        elem = {'elem': OrderedDict({'name': k})}
+                        #elem.name = k
+                    else:
+                        k, val = tuple(k.replace('"', '').split('='))
+                        keys['name'] = k
+                        keys['value'] = val
+                elem['elem'].update({'key': keys})
+                #elem.key.update(keys)
+            else:
+                elem = {'elem': {'name': token}}
+                #elem.name = token
+            yield elem
+
+    def combine_segments(self, segments):
+        xpaths = [seg[0] for seg in segments]
+        prev_path = ''
+        extentions = []
+        for path in xpaths:
+            if not prev_path:
+                prev_path = path
+                continue
+            if len(path) > len(prev_path):
+                short_path = prev_path
+                long_path = path
+            else:
+                short_path = path
+                long_path = prev_path
+            if short_path in long_path:
+                end = long_path[:len(short_path)].split()
+                extentions.append((short_path, end))
+                removes = [seg for seg in segments if seg[0] == short_path]
+                for seg in removes:
+                    segments.remove(seg)
+        import pdb; pdb.set_trace()
+        print(segments)
+
+
+
+    def resolve_segments(self, segments, required_segments=[]):
+        duplicates = []
+        if not segments:
+            return required_segments
+        xpath, elems, value = segments.pop(0)
+        for seg in segments:
+            if seg == (xpath, elems, value):
+                # Duplicate so move on
+                duplicates.append(seg)
+                continue
+            next_xpath, next_elems, next_value = seg
+
+            if xpath in next_xpath:
+                # Check if segment is a key
+                for seg in segments:
+                    #for elem in seg[1]:
+                    if xpath != seg['elem'].get('keybase', ''):
+                        continue
+                    else:
+                        break
+                else:
+                    # This is a key
+                    return self.resolve_segments(
+                        segments,
+                        required_segments
+                    )
+            required_segments.append((xpath, elems, value))
+        return self.resolve_segments(segments, required_segments)

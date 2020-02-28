@@ -131,27 +131,27 @@ class XEClient(Client):
         if not any([update_json_configs, replace_json_configs]):
             raise Exception("Must supply at least one set of configurations to method!")
 
-        def check_configs(name, configs):
-            if isinstance(name, string_types):
-                logging.debug("Handling %s as JSON string.", name)
+        def check_configs(configs):
+            if isinstance(configs, string_types):
+                logging.debug("Handling as JSON string.")
                 try:
                     configs = json.loads(configs)
                 except:
-                    raise Exception("{name} is invalid JSON!".format(name=name))
+                    raise Exception("{0}\n is invalid JSON!".format(configs))
                 configs = [configs]
-            elif isinstance(name, dict):
-                logging.debug("Handling %s as already serialized JSON object.", name)
+            elif isinstance(configs, dict):
+                logging.debug("Handling already serialized JSON object.")
                 configs = [configs]
             elif not isinstance(configs, (list, set)):
                 raise Exception(
-                    "{name} must be an iterable of configs!".format(name=name)
+                    "{0} must be an iterable of configs!".format(str(configs))
                 )
             return configs
 
-        def create_updates(name, configs):
+        def create_updates(configs):
             if not configs:
                 return None
-            configs = check_configs(name, configs)
+            configs = check_configs(configs)
             updates = []
             for config in configs:
                 if not isinstance(config, dict):
@@ -159,6 +159,12 @@ class XEClient(Client):
                 if len(config.keys()) > 1:
                     raise Exception("config should only target one YANG module!")
                 top_element = next(iter(config.keys()))
+                # start mike
+                # path_obj = self.parse_xpath_to_gnmi_path(top_element)
+                # config = config.pop(top_element)
+                # value_obj = proto.gnmi_pb2.TypedValue(json_ietf_val=json.dumps(config).encode("utf-8"))
+                # update = proto.gnmi_pb2.Update(path=path_obj, val=value_obj)
+                # end mike
                 update = proto.gnmi_pb2.Update()
                 update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
                 config = config.pop(top_element)
@@ -169,8 +175,8 @@ class XEClient(Client):
                 updates.append(update)
             return updates
 
-        updates = create_updates("update_json_configs", update_json_configs)
-        replaces = create_updates("replace_json_configs", replace_json_configs)
+        updates = create_updates(update_json_configs)
+        replaces = create_updates(replace_json_configs)
         return self.set(updates=updates, replaces=replaces)
 
     def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
@@ -318,7 +324,7 @@ class XEClient(Client):
         """
         if origin is None:
             # naive but effective
-            if ":" not in xpath:
+            if "openconfig" in xpath:
                 origin = "openconfig"
             else:
                 origin = "rfc7951"

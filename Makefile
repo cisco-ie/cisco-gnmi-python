@@ -85,3 +85,21 @@ help:
 			} \
 		}' \
 		$(MAKEFILE_LIST)
+
+## Setup links in virtual env for development
+develop:
+	@echo "--------------------------------------------------------------------"
+	@echo "Setting up development environment"
+	@python setup.py develop --no-deps -q
+	@echo ""
+	@echo "Done."
+	@echo ""
+
+## Remove development links in virtual env
+undevelop:
+	@echo "--------------------------------------------------------------------"
+	@echo "Removing development environment"
+	@python setup.py develop --no-deps -q --uninstall
+	@echo ""
+	@echo "Done."
+	@echo ""
