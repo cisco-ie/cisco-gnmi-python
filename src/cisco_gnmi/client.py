@@ -341,7 +341,6 @@ class Client(object):
     def xpath_iterator(self, xpath):
         for token in xpath[1:].split('/'):
             #elem = proto.gnmi_pb2.PathElem()
-            xpath_so_far += '/' + token
             if '[' in token:
                 keys = OrderedDict()
                 subtoken = token.replace('[', ',').replace(']', '').split(',')

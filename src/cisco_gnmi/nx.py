@@ -55,6 +55,76 @@ class NXClient(Client):
     >>> print(capabilities)
     """
 
+    def xpath_to_path_elem(self, request):
+        paths = []
+        message = {
+            'update': [],
+            'replace': [],
+            'delete': [],
+            'get': [],
+        }
+        if 'nodes' not in request:
+            # TODO: raw rpc?
+            return paths
+        else:
+            namespace_modules = {}
+            for prefix, nspace in request.get('namespace', {}).items():
+                module = ''
+                if '/Cisco-IOS-' in nspace:
+                    module = nspace[nspace.rfind('/') + 1:]
+                elif '/cisco-nx' in nspace: # NXOS lowercases namespace
+                    module = 'Cisco-NX-OS-device'
+                elif '/openconfig.net' in nspace:
+                    module = 'openconfig-'
+                    module += nspace[nspace.rfind('/') + 1:]
+                elif 'urn:ietf:params:xml:ns:yang:' in nspace:
+                    module = nspace.replace(
+                        'urn:ietf:params:xml:ns:yang:', '')
+                if module:
+                    namespace_modules[prefix] = module
+            for node in request.get('nodes', []):
+                if 'xpath' not in node:
+                    log.error('Xpath is not in message')
+                else:
+                    xpath = node['xpath']
+                    value = node.get('value', '')
+                    edit_op = node.get('edit-op', '')
+
+                    for pfx, ns in namespace_modules.items():
+                        xpath = xpath.replace(pfx + ':', '')
+                        value = value.replace(pfx + ':', '')
+                    if edit_op:
+                        if edit_op in ['create', 'merge', 'replace']:
+                            xpath_lst = xpath.split('/')
+                            name = xpath_lst.pop()
+                            xpath = '/'.join(xpath_lst)
+                            if edit_op == 'replace':
+                                if not message['replace']:
+                                    message['replace'] = [{
+                                        xpath: {name: value}
+                                    }]
+                                else:
+                                    message['replace'].append(
+                                        {xpath: {name: value}}
+                                    )
+                            else:
+                                if not message['update']:
+                                    message['update'] = [{
+                                        xpath: {name: value}
+                                    }]
+                                else:
+                                    message['update'].append(
+                                        {xpath: {name: value}}
+                                    )
+                        elif edit_op in ['delete', 'remove']:
+                            if message['delete']:
+                                message['delete'].add(xpath)
+                            else:
+                                message['delete'] = set(xpath)
+                    else:
+                        message['get'].append(xpath)
+        return namespace_modules, message
+
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
         to be passed to set() as the delete parameter.
@@ -86,6 +156,31 @@ class NXClient(Client):
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
             paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
+
+    def segment_configs(self, request, configs=[]):
+        seg_config = []
+        for config in configs:
+            top_element = next(iter(config.keys()))
+            name, val = (next(iter(config[top_element].items())))
+            value = {'name': name, 'value': val}
+            seg_config.append(
+                (
+                    top_element,
+                    [seg for seg in self.xpath_iterator(top_element)],
+                    value
+                )
+            )
+        import pdb; pdb.set_trace()
+        # seg_config = self.resolve_segments(seg_config)
+        # Build the Path
+        path = proto.gnmi_pb2.Path()
+        for config in seg_config:
+            xpath, segments, value = config
+            for seg in segments:
+                path_elem = proto.gnmi_pb2.PathElem()
+                path_elem.name = seg['elem']['name']
+            
+        return seg_config
 
     def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
@@ -127,36 +222,12 @@ class NXClient(Client):
                 )
             return configs
 
-        def segment_configs(configs=[]):
-            seg_config = []
-            for config in configs:
-                top_element = next(iter(config.keys()))
-                name, val = (next(iter(config[top_element].items())))
-                value = {'name': name, 'value': val}
-                seg_config.append(
-                    (
-                        top_element,
-                        [seg for seg in self.xpath_iterator(top_element)],
-                        value
-                    )
-                )
-            import pdb; pdb.set_trace()
-            seg_config = self.resolve_segments(seg_config)
-            # Build the Path
-            path = proto.gnmi_pb2.Path()
-            for config in seg_config:
-                xpath, segments, value = config
-                for seg in segments:
-                    path_elem = proto.gnmi_pb2.PathElem()
-                    path_elem.name = seg['elem']['name']
-            return seg_config
-
         def create_updates(configs):
             if not configs:
                 return None
             configs = check_configs(configs)
             import pdb; pdb.set_trace()
-            #segment_configs(configs)
+            #self.segment_configs(configs)
             updates = []
             for config in configs:
                 if not isinstance(config, dict):
@@ -251,106 +322,6 @@ class NXClient(Client):
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
-
-    def subscribe_xpaths(
-        self,
-        xpath_subscriptions,
-        encoding="JSON_IETF",
-        sample_interval=Client._NS_IN_S * 10,
-        heartbeat_interval=None,
-    ):
-        """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
-        with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
-        dictionaries with Subscription attributes for more granularity, or already built Subscription
-        objects and builds the SubscriptionList. Fields not supplied will be defaulted with the default arguments
-        to the method.
-
-        Generates a single SubscribeRequest.
-
-        Parameters
-        ----------
-        xpath_subscriptions : str or iterable of str, dict, Subscription
-            An iterable which is parsed to form the Subscriptions in the SubscriptionList to be passed
-            to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
-            dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
-            treated as simply a pre-made Subscription.
-        encoding : proto.gnmi_pb2.Encoding, optional
-            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
-            [JSON, JSON_IETF]
-        sample_interval : int, optional
-            Default nanoseconds for sample to occur.
-            Defaults to 10 seconds.
-        heartbeat_interval : int, optional
-            Specifies the maximum allowable silent period in nanoseconds when
-            suppress_redundant is in use. The target should send a value at least once
-            in the period specified.
-
-        Returns
-        -------
-        subscribe()
-        """
-        supported_request_modes = ["STREAM"]
-        request_mode = "STREAM"
-        supported_sub_modes = ["SAMPLE"]
-        sub_mode = "SAMPLE"
-        supported_encodings = ["JSON", "JSON_IETF"]
-        subscription_list = proto.gnmi_pb2.SubscriptionList()
-        subscription_list.mode = util.validate_proto_enum(
-            "mode",
-            request_mode,
-            "SubscriptionList.Mode",
-            proto.gnmi_pb2.SubscriptionList.Mode,
-            supported_request_modes,
-        )
-        subscription_list.encoding = util.validate_proto_enum(
-            "encoding",
-            encoding,
-            "Encoding",
-            proto.gnmi_pb2.Encoding,
-            supported_encodings,
-        )
-        if isinstance(xpath_subscriptions, string_types):
-            xpath_subscriptions = [xpath_subscriptions]
-        subscriptions = []
-        for xpath_subscription in xpath_subscriptions:
-            subscription = None
-            if isinstance(xpath_subscription, string_types):
-                subscription = proto.gnmi_pb2.Subscription()
-                subscription.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(xpath_subscription)
-                )
-                subscription.mode = util.validate_proto_enum(
-                    "sub_mode",
-                    sub_mode,
-                    "SubscriptionMode",
-                    proto.gnmi_pb2.SubscriptionMode,
-                    supported_sub_modes,
-                )
-                subscription.sample_interval = sample_interval
-            elif isinstance(xpath_subscription, dict):
-                path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
-                arg_dict = {
-                    "path": path,
-                    "mode": sub_mode,
-                    "sample_interval": sample_interval,
-                }
-                arg_dict.update(xpath_subscription)
-                if "mode" in arg_dict:
-                    arg_dict["mode"] = util.validate_proto_enum(
-                        "sub_mode",
-                        arg_dict["mode"],
-                        "SubscriptionMode",
-                        proto.gnmi_pb2.SubscriptionMode,
-                        supported_sub_modes,
-                    )
-                subscription = proto.gnmi_pb2.Subscription(**arg_dict)
-            elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
-                subscription = xpath_subscription
-            else:
-                raise Exception("xpath in list must be xpath or dict/Path!")
-            subscriptions.append(subscription)
-        subscription_list.subscription.extend(subscriptions)
-        return self.subscribe([subscription_list])
 
     def subscribe_xpaths(
         self,

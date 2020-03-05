@@ -76,6 +76,76 @@ class XEClient(Client):
     >>> delete_response = client.delete_xpaths('/Cisco-IOS-XE-native:native/hostname')
     """
 
+    def xpath_to_path_elem(self, request):
+        paths = []
+        message = {
+            'update': [],
+            'replace': [],
+            'delete': [],
+            'get': [],
+        }
+        if 'nodes' not in request:
+            # TODO: raw rpc?
+            return paths
+        else:
+            namespace_modules = {}
+            for prefix, nspace in request.get('namespace', {}).items():
+                module = ''
+                if '/Cisco-IOS-' in nspace:
+                    module = nspace[nspace.rfind('/') + 1:]
+                elif '/cisco-nx' in nspace: # NXOS lowercases namespace
+                    module = 'Cisco-NX-OS-device'
+                elif '/openconfig.net' in nspace:
+                    module = 'openconfig-'
+                    module += nspace[nspace.rfind('/') + 1:]
+                elif 'urn:ietf:params:xml:ns:yang:' in nspace:
+                    module = nspace.replace(
+                        'urn:ietf:params:xml:ns:yang:', '')
+                if module:
+                    namespace_modules[prefix] = module
+            for node in request.get('nodes', []):
+                if 'xpath' not in node:
+                    log.error('Xpath is not in message')
+                else:
+                    xpath = node['xpath']
+                    value = node.get('value', '')
+                    edit_op = node.get('edit-op', '')
+
+                    for pfx, ns in namespace_modules.items():
+                        xpath = xpath.replace(pfx + ':', ns + ':')
+                        value = value.replace(pfx + ':', ns + ':')
+                    if edit_op:
+                        if edit_op in ['create', 'merge', 'replace']:
+                            xpath_lst = xpath.split('/')
+                            name = xpath_lst.pop()
+                            xpath = '/'.join(xpath_lst)
+                            if edit_op == 'replace':
+                                if not message['replace']:
+                                    message['replace'] = [{
+                                        xpath: {name: value}
+                                    }]
+                                else:
+                                    message['replace'].append(
+                                        {xpath: {name: value}}
+                                    )
+                            else:
+                                if not message['update']:
+                                    message['update'] = [{
+                                        xpath: {name: value}
+                                    }]
+                                else:
+                                    message['update'].append(
+                                        {xpath: {name: value}}
+                                    )
+                        elif edit_op in ['delete', 'remove']:
+                            if message['delete']:
+                                message['delete'].add(xpath)
+                            else:
+                                message['delete'] = set(xpath)
+                    else:
+                        message['get'].append(xpath)
+        return namespace_modules, message
+
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
         to be passed to set() as the delete parameter.

@@ -90,7 +90,7 @@ help:
 develop:
 	@echo "--------------------------------------------------------------------"
 	@echo "Setting up development environment"
-	@python setup.py develop --no-deps -q
+	@python setup.py develop -q
 	@echo ""
 	@echo "Done."
 	@echo ""
@@ -99,7 +99,7 @@ develop:
 undevelop:
 	@echo "--------------------------------------------------------------------"
 	@echo "Removing development environment"
-	@python setup.py develop --no-deps -q --uninstall
+	@python setup.py develop -q --uninstall
 	@echo ""
 	@echo "Done."
 	@echo ""
