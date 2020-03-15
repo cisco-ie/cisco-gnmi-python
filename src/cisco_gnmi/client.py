@@ -26,6 +26,9 @@ the License.
 import logging
 from collections import OrderedDict
 from xml.etree.ElementPath import xpath_tokenizer_re
+import re
+import json
+import os
 from six import string_types
 
 from . import proto
@@ -338,77 +341,171 @@ class Client(object):
         path.elem.extend(path_elems)
         return path
 
-    def xpath_iterator(self, xpath):
-        for token in xpath[1:].split('/'):
-            #elem = proto.gnmi_pb2.PathElem()
-            if '[' in token:
-                keys = OrderedDict()
-                subtoken = token.replace('[', ',').replace(']', '').split(',')
-                for k in subtoken:
-                    if '=' not in k:
-                        elem = {'elem': OrderedDict({'name': k})}
-                        #elem.name = k
+    def combine_configs(self, payload, last_xpath, xpath, config):
+        last_set = set(last_xpath.split('/'))
+        curr_diff = set(xpath.split('/')) - last_set
+        if len(curr_diff) > 1:
+            print('combine_configs() error1')
+            return payload
+        index = curr_diff.pop()
+        curr_xpath = xpath[xpath.find(index):]
+        curr_xpath = curr_xpath.split('/')
+        curr_xpath.reverse()
+        for seg in curr_xpath:
+            config = {seg: config}
+
+        last_diff = last_set - set(xpath.split('/'))
+        if len(last_diff) > 1:
+            print('combine_configs() error2')
+            return payload
+        last_xpath = last_xpath[last_xpath.find(last_diff.pop()):]
+        last_xpath = last_xpath.split('/')
+        last_xpath.reverse()
+        for seg in last_xpath:
+            if seg not in payload:
+                payload = {seg: payload}
+        payload.update(config)
+        return payload
+
+    def xpath_to_json(self, configs, last_xpath='', payload={}):
+        for i, cfg in enumerate(configs, 1):
+            xpath, config, is_key = cfg
+            if last_xpath and xpath not in last_xpath:
+                # Branched config here
+                #   |---last xpath config
+                # --|
+                #   |---this xpath config
+                payload = self.combine_configs(payload, last_xpath, xpath, config)
+                return self.xpath_to_json(configs[i:], xpath, payload)
+            xpath_segs = xpath.split('/')
+            xpath_segs.reverse()
+            for seg in xpath_segs:
+                if not seg:
+                    continue
+                if payload:
+                    if is_key:
+                        if seg in payload:
+                            if isinstance(payload[seg], list):
+                                payload[seg].append(config)
+                            elif isinstance(payload[seg], dict):
+                                payload[seg].update(config)
+                        else:
+                            payload.update(config)
+                            payload = {seg: [payload]}
                     else:
-                        k, val = tuple(k.replace('"', '').split('='))
-                        keys['name'] = k
-                        keys['value'] = val
-                elem['elem'].update({'key': keys})
-                #elem.key.update(keys)
-            else:
-                elem = {'elem': {'name': token}}
-                #elem.name = token
-            yield elem
-
-    def combine_segments(self, segments):
-        xpaths = [seg[0] for seg in segments]
-        prev_path = ''
-        extentions = []
-        for path in xpaths:
-            if not prev_path:
-                prev_path = path
-                continue
-            if len(path) > len(prev_path):
-                short_path = prev_path
-                long_path = path
-            else:
-                short_path = path
-                long_path = prev_path
-            if short_path in long_path:
-                end = long_path[:len(short_path)].split()
-                extentions.append((short_path, end))
-                removes = [seg for seg in segments if seg[0] == short_path]
-                for seg in removes:
-                    segments.remove(seg)
-        import pdb; pdb.set_trace()
-        print(segments)
-
-
-
-    def resolve_segments(self, segments, required_segments=[]):
-        duplicates = []
-        if not segments:
-            return required_segments
-        xpath, elems, value = segments.pop(0)
-        for seg in segments:
-            if seg == (xpath, elems, value):
-                # Duplicate so move on
-                duplicates.append(seg)
-                continue
-            next_xpath, next_elems, next_value = seg
-
-            if xpath in next_xpath:
-                # Check if segment is a key
-                for seg in segments:
-                    #for elem in seg[1]:
-                    if xpath != seg['elem'].get('keybase', ''):
-                        continue
-                    else:
-                        break
+                        config.update(payload)
+                        payload = {seg: config}
+                    return self.xpath_to_json(configs[i:], xpath, payload)
                 else:
-                    # This is a key
-                    return self.resolve_segments(
-                        segments,
-                        required_segments
-                    )
-            required_segments.append((xpath, elems, value))
-        return self.resolve_segments(segments, required_segments)
+                    if is_key:
+                        payload = {seg: [config]}
+                    else:
+                        payload = {seg: config}
+                    return self.xpath_to_json(configs[i:], xpath, payload)
+        return payload
+
+    # Pattern to detect keys in an xpath
+    RE_FIND_KEYS = re.compile(r'\[.*?\]')
+
+    def get_payload(self, configs):
+        # Number of updates are limited so try to consolidate into lists.
+        xpaths_cfg = []
+        first_key = set()
+        # Find first common keys for all xpaths_cfg of collection.
+        for config in configs:
+            xpath = next(iter(config.keys()))
+
+            # Change configs to tuples (xpath, config) for easier management
+            xpaths_cfg.append((xpath, config[xpath]))
+
+            xpath_split = xpath.split('/')
+            for seg in xpath_split:
+                if '[' in seg:
+                    first_key.add(seg)
+                    break
+
+        # Common first key/configs represents one GNMI update
+        updates = []
+        for key in first_key:
+            update = []
+            remove_cfg = []
+            for config in xpaths_cfg:
+                xpath, cfg = config
+                if key in xpath:
+                    update.append(config)
+                else:
+                    for k, v in cfg.items():
+                        if '[{0}="{1}"]'.format(k, v) not in key:
+                            break
+                    else:
+                        # This cfg sets the first key so we don't need it
+                        remove_cfg.append((xpath, cfg))
+            if update:
+                for upd in update:
+                    # Remove this config out of main list
+                    xpaths_cfg.remove(upd)
+                for rem_cfg in remove_cfg:
+                    # Sets a key in update path so remove it
+                    xpaths_cfg.remove(rem_cfg)
+                updates.append(update)
+                break
+
+        # Add remaining configs to updates
+        if xpaths_cfg:
+            updates.append(xpaths_cfg)
+
+        # Combine all xpath configs of each update if possible
+        xpaths = []
+        compressed_updates = []
+        for update in updates:
+            xpath_consolidated = {}
+            config_compressed = []
+            for seg in update:
+                xpath, config = seg
+                if xpath in xpath_consolidated:
+                    xpath_consolidated[xpath].update(config)
+                else:
+                    xpath_consolidated[xpath] = config
+                    config_compressed.append((xpath, xpath_consolidated[xpath]))
+                    xpaths.append(xpath)
+
+            # Now get the update path for this batch of configs
+            common_xpath = os.path.commonprefix(xpaths)
+            cfg_compressed = []
+            keys = []
+
+            # Need to reverse the configs to build the dict correctly
+            config_compressed.reverse()
+            for seg in config_compressed:
+                is_key = False
+                prepend_path = ''
+                xpath, config = seg
+                end_path = xpath[len(common_xpath):]
+                if end_path.startswith('['):
+                    # Don't start payload with a list
+                    tmp = common_xpath.split('/')
+                    prepend_path = '/' + tmp.pop()
+                    common_xpath = '/'.join(tmp)
+                end_path = prepend_path + end_path
+
+                # Building json, need to identify configs that set keys
+                for key in keys:
+                    if [k for k in config.keys() if k in key]:
+                        is_key = True
+                keys += re.findall(self.RE_FIND_KEYS, end_path)
+                cfg_compressed.append((end_path, config, is_key))
+
+            update = (common_xpath, cfg_compressed)
+            compressed_updates.append(update)
+
+        updates = []
+        for update in compressed_updates:
+            common_xpath, cfgs = update
+            payload = self.xpath_to_json(cfgs)
+            updates.append(
+                (
+                    common_xpath,
+                    json.dumps(payload).encode('utf-8')
+                )
+            )
+        return updates

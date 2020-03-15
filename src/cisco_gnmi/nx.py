@@ -68,8 +68,8 @@ class NXClient(Client):
             return paths
         else:
             namespace_modules = {}
+            origin = 'DME'
             for prefix, nspace in request.get('namespace', {}).items():
-                module = ''
                 if '/Cisco-IOS-' in nspace:
                     module = nspace[nspace.rfind('/') + 1:]
                 elif '/cisco-nx' in nspace: # NXOS lowercases namespace
@@ -82,6 +82,7 @@ class NXClient(Client):
                         'urn:ietf:params:xml:ns:yang:', '')
                 if module:
                     namespace_modules[prefix] = module
+
             for node in request.get('nodes', []):
                 if 'xpath' not in node:
                     log.error('Xpath is not in message')
@@ -91,8 +92,15 @@ class NXClient(Client):
                     edit_op = node.get('edit-op', '')
 
                     for pfx, ns in namespace_modules.items():
-                        xpath = xpath.replace(pfx + ':', '')
-                        value = value.replace(pfx + ':', '')
+                        # NXOS does not support prefixes yet so clear them out
+                        if pfx in xpath and 'openconfig' in ns:
+                            origin = 'openconfig'
+                            xpath = xpath.replace(pfx + ':', '')
+                            value = value.replace(pfx + ':', '')
+                        elif pfx in xpath and 'device' in ns:
+                            origin = 'device'
+                            xpath = xpath.replace(pfx + ':', '')
+                            value = value.replace(pfx + ':', '')
                     if edit_op:
                         if edit_op in ['create', 'merge', 'replace']:
                             xpath_lst = xpath.split('/')
@@ -123,7 +131,7 @@ class NXClient(Client):
                                 message['delete'] = set(xpath)
                     else:
                         message['get'].append(xpath)
-        return namespace_modules, message
+        return namespace_modules, message, origin
 
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
@@ -157,32 +165,64 @@ class NXClient(Client):
             paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
-    def segment_configs(self, request, configs=[]):
-        seg_config = []
-        for config in configs:
-            top_element = next(iter(config.keys()))
-            name, val = (next(iter(config[top_element].items())))
-            value = {'name': name, 'value': val}
-            seg_config.append(
-                (
-                    top_element,
-                    [seg for seg in self.xpath_iterator(top_element)],
-                    value
-                )
+    def check_configs(self, configs):
+        if isinstance(configs, string_types):
+            logging.debug("Handling as JSON string.")
+            try:
+                configs = json.loads(configs)
+            except:
+                raise Exception("{0}\n is invalid JSON!".format(configs))
+            configs = [configs]
+        elif isinstance(configs, dict):
+            logging.debug("Handling already serialized JSON object.")
+            configs = [configs]
+        elif not isinstance(configs, (list, set)):
+            raise Exception(
+                "{0} must be an iterable of configs!".format(str(configs))
             )
-        import pdb; pdb.set_trace()
-        # seg_config = self.resolve_segments(seg_config)
-        # Build the Path
-        path = proto.gnmi_pb2.Path()
-        for config in seg_config:
-            xpath, segments, value = config
-            for seg in segments:
-                path_elem = proto.gnmi_pb2.PathElem()
-                path_elem.name = seg['elem']['name']
-            
-        return seg_config
+        return configs
 
-    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
+    def create_updates(self, configs, origin):
+        if not configs:
+            return None
+        configs = self.check_configs(configs)
+
+        xpaths = []
+        updates = []
+        for config in configs:
+            xpath = next(iter(config.keys()))
+            xpaths.append(xpath)
+        common_xpath = os.path.commonprefix(xpaths)
+
+        if common_xpath:
+            update_configs = self.get_payload(configs)
+            for update_cfg in update_configs:
+                xpath, payload = update_cfg
+                update = proto.gnmi_pb2.Update()
+                update.path.CopyFrom(
+                    self.parse_xpath_to_gnmi_path(
+                        xpath, origin=origin
+                    )
+                )
+                update.val.json_val = payload
+                updates.append(update)
+                logging.info('GNMI set:\n\n{0}'.format(str(update)))
+            return updates
+        else:
+            for config in configs:
+                top_element = next(iter(config.keys()))
+                update = proto.gnmi_pb2.Update()
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
+                config = config.pop(top_element)
+                if ietf:
+                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
+                else:
+                    update.val.json_val = json.dumps(config).encode("utf-8")
+                updates.append(update)
+            return updates
+
+    def set_json(self, update_json_configs=None, replace_json_configs=None,
+                 origin='device'):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -195,8 +235,7 @@ class NXClient(Client):
             JSON configs to apply as updates.
         replace_json_configs : iterable of JSON configurations, optional
             JSON configs to apply as replacements.
-        ietf : bool, optional
-            Use JSON_IETF vs JSON.
+        origin : openconfig, device, or DME
 
         Returns
         -------
@@ -205,87 +244,12 @@ class NXClient(Client):
         if not any([update_json_configs, replace_json_configs]):
             raise Exception("Must supply at least one set of configurations to method!")
 
-        def check_configs(configs):
-            if isinstance(configs, string_types):
-                logging.debug("Handling as JSON string.")
-                try:
-                    configs = json.loads(configs)
-                except:
-                    raise Exception("{0}\n is invalid JSON!".format(configs))
-                configs = [configs]
-            elif isinstance(configs, dict):
-                logging.debug("Handling already serialized JSON object.")
-                configs = [configs]
-            elif not isinstance(configs, (list, set)):
-                raise Exception(
-                    "{0} must be an iterable of configs!".format(str(configs))
-                )
-            return configs
-
-        def create_updates(configs):
-            if not configs:
-                return None
-            configs = check_configs(configs)
-            import pdb; pdb.set_trace()
-            #self.segment_configs(configs)
-            updates = []
-            for config in configs:
-                if not isinstance(config, dict):
-                    raise Exception("config must be a JSON object!")
-                if len(config.keys()) > 1:
-                    raise Exception("config should only target one YANG module!")
-                top_element = next(iter(config.keys()))
-                update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
-                config = config.pop(top_element)
-                if ietf:
-                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
-                else:
-                    update.val.json_val = json.dumps(config).encode("utf-8")
-                updates.append(update)
-            return updates
-        # def create_updates(configs):
-        #     if not configs:
-        #         return None
-        #     configs = check_configs(configs)
-        #     updates = []
-        #     xpaths = []
-        #     bottom_xpath = []
-        #     seg_keys = {}
-        #     for config in configs:
-        #         if not isinstance(config, dict):
-        #             raise Exception("config must be a JSON object!")
-        #         if len(config.keys()) > 1:
-        #             raise Exception("config should only target one YANG module!")
-        #         xpaths.append(next(iter(config.keys())))
-        #     top = os.path.dirname(os.path.commonprefix(xpaths))
-        #     top_xpath = [s['segment'] for s in self.xpath_iterator(top)]
-        #     bottom_xpath = [s for s in self.xpath_iterator(xpath[len(top):])
-        #     for xpath in xpaths:
-        #         for seg in self.xpath_iterator(xpath[len(top):]):
-        #             if 'keys' in seg:
-        #                 if not seg_keys:
-        #                     seg_keys = seg['keys']
-        #                 else:
-        #                     for k,v in seg['keys'].items():
-        #                         if k in seg_keys:
-        #                             seg_keys[k].update(v)
-        #                         else:
-        #                             seg_keys[k] = v
-        #             else:
-        #                 bottom_xpath.append(seg['segment'])
-        #     for seg in bottom_xpath:
-        #         if seg not in top_xpath:
-        #             top_xpath.append(seg)
-        #     for key, val in seg_keys.items():
-        #         top_xpath[top_xpath.index(key)] = {key: val}
-        #     import pdb; pdb.set_trace()
-
-        updates = create_updates(update_json_configs)
-        replaces = create_updates(replace_json_configs)
+        updates = self.create_updates(update_json_configs, origin=origin)
+        replaces = self.create_updates(replace_json_configs, origin=origin)
         return self.set(updates=updates, replaces=replaces)
 
-    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON"):
+    def get_xpaths(self, xpaths, data_type="ALL",
+                   encoding="JSON", origin='openconfig'):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
 
         Parameters
@@ -314,9 +278,11 @@ class NXClient(Client):
         )
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
+            gnmi_path = []
+            for xpath in set(xpaths):
+                gnmi_path.append(self.parse_xpath_to_gnmi_path(xpath, origin))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
+            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths, origin)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
@@ -330,6 +296,7 @@ class NXClient(Client):
         sub_mode="SAMPLE",
         encoding="PROTO",
         sample_interval=Client._NS_IN_S * 10,
+        origin='openconfig'
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -393,7 +360,10 @@ class NXClient(Client):
             if isinstance(xpath_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(xpath_subscription)
+                    self.parse_xpath_to_gnmi_path(
+                        xpath_subscription,
+                        origin
+                    )
                 )
                 subscription.mode = util.validate_proto_enum(
                     "sub_mode",
@@ -404,7 +374,10 @@ class NXClient(Client):
                 )
                 subscription.sample_interval = sample_interval
             elif isinstance(xpath_subscription, dict):
-                path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
+                path = self.parse_xpath_to_gnmi_path(
+                    xpath_subscription["path"],
+                    origin
+                )
                 arg_dict = {
                     "path": path,
                     "mode": sub_mode,
@@ -428,18 +401,14 @@ class NXClient(Client):
         subscription_list.subscription.extend(subscriptions)
         return self.subscribe([subscription_list])
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    def parse_xpath_to_gnmi_path(self, xpath, origin):
         """Origin defaults to YANG (device) paths
         Otherwise specify "DME" as origin
         """
-        if xpath.startswith("openconfig"):
-            raise NotImplementedError(
-                "OpenConfig data models not yet supported on NX-OS!"
-            )
         if origin is None:
             if any(map(xpath.startswith, ["/Cisco-NX-OS-device", "/ietf-interfaces"])):
                 origin = "device"
             else:
                 origin = "DME"
-        origin=None
+
         return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
