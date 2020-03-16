@@ -31,6 +31,8 @@ import os
 from six import string_types
 from .client import Client, proto, util
 
+logger = logging.getLogger(__name__)
+
 
 class NXClient(Client):
     """NX-OS-specific wrapper for gNMI functionality.
@@ -167,14 +169,14 @@ class NXClient(Client):
 
     def check_configs(self, configs):
         if isinstance(configs, string_types):
-            logging.debug("Handling as JSON string.")
+            logger.debug("Handling as JSON string.")
             try:
                 configs = json.loads(configs)
             except:
                 raise Exception("{0}\n is invalid JSON!".format(configs))
             configs = [configs]
         elif isinstance(configs, dict):
-            logging.debug("Handling already serialized JSON object.")
+            logger.debug("Handling already serialized JSON object.")
             configs = [configs]
         elif not isinstance(configs, (list, set)):
             raise Exception(
@@ -206,7 +208,6 @@ class NXClient(Client):
                 )
                 update.val.json_val = payload
                 updates.append(update)
-                logging.info('GNMI set:\n\n{0}'.format(str(update)))
             return updates
         else:
             for config in configs:
@@ -245,6 +246,8 @@ class NXClient(Client):
             raise Exception("Must supply at least one set of configurations to method!")
 
         updates = self.create_updates(update_json_configs, origin=origin)
+        for update in updates:
+            logger.info('\nGNMI set:\n{0}\n{1}'.format(9 * '=', str(update)))
         replaces = self.create_updates(replace_json_configs, origin=origin)
         return self.set(updates=updates, replaces=replaces)
 
@@ -287,6 +290,7 @@ class NXClient(Client):
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
+        logger.info('GNMI get:\n{0}\n{1}'.format(9 * '=', str(gnmi_path)))
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def subscribe_xpaths(
@@ -399,6 +403,9 @@ class NXClient(Client):
                 raise Exception("xpath in list must be xpath or dict/Path!")
             subscriptions.append(subscription)
         subscription_list.subscription.extend(subscriptions)
+        logger.info('GNMI subscribe:\n{0}\n{1}'.format(
+            15 * '=', str(subscription_list))
+        )
         return self.subscribe([subscription_list])
 
     def parse_xpath_to_gnmi_path(self, xpath, origin):
