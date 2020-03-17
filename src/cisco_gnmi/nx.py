@@ -186,7 +186,7 @@ class NXClient(Client):
             )
         return configs
 
-    def create_updates(self, configs, origin):
+    def create_updates(self, configs, origin, json_ietf=False):
         if not configs:
             return None
         configs = self.check_configs(configs)
@@ -208,7 +208,10 @@ class NXClient(Client):
                         xpath, origin=origin
                     )
                 )
-                update.val.json_val = payload
+                if json_ietf:
+                    update.val.json_ietf_val = payload
+                else:
+                    update.val.json_val = payload
                 updates.append(update)
             return updates
         else:
@@ -217,7 +220,7 @@ class NXClient(Client):
                 update = proto.gnmi_pb2.Update()
                 update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
                 config = config.pop(top_element)
-                if ietf:
+                if json_ietf:
                     update.val.json_ietf_val = json.dumps(config).encode("utf-8")
                 else:
                     update.val.json_val = json.dumps(config).encode("utf-8")
@@ -225,7 +228,7 @@ class NXClient(Client):
             return updates
 
     def set_json(self, update_json_configs=None, replace_json_configs=None,
-                 origin='device'):
+                 origin='device', json_ietf=False):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -247,10 +250,19 @@ class NXClient(Client):
         if not any([update_json_configs, replace_json_configs]):
             raise Exception("Must supply at least one set of configurations to method!")
 
-        updates = self.create_updates(update_json_configs, origin=origin)
-        for update in updates:
+        updates = self.create_updates(
+            update_json_configs,
+            origin=origin,
+            json_ietf=json_ietf
+        )
+        replaces = self.create_updates(
+            replace_json_configs,
+            origin=origin,
+            json_ietf=json_ietf
+        )
+        for update in updates + replaces:
             logger.info('\nGNMI set:\n{0}\n{1}'.format(9 * '=', str(update)))
-        replaces = self.create_updates(replace_json_configs, origin=origin)
+
         return self.set(updates=updates, replaces=replaces)
 
     def get_xpaths(self, xpaths, data_type="ALL",
