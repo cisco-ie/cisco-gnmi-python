@@ -29,6 +29,8 @@ import logging
 from six import string_types
 from .client import Client, proto, util
 
+logger = logging.getLogger(__name__)
+
 
 class XEClient(Client):
     """IOS XE-specific wrapper for gNMI functionality.
@@ -93,8 +95,6 @@ class XEClient(Client):
                 module = ''
                 if '/Cisco-IOS-' in nspace:
                     module = nspace[nspace.rfind('/') + 1:]
-                elif '/cisco-nx' in nspace: # NXOS lowercases namespace
-                    module = 'Cisco-NX-OS-device'
                 elif '/openconfig.net' in nspace:
                     module = 'openconfig-'
                     module += nspace[nspace.rfind('/') + 1:]
@@ -112,8 +112,11 @@ class XEClient(Client):
                     edit_op = node.get('edit-op', '')
 
                     for pfx, ns in namespace_modules.items():
-                        xpath = xpath.replace(pfx + ':', ns + ':')
-                        value = value.replace(pfx + ':', ns + ':')
+                        if pfx in xpath and 'openconfig' in ns:
+                            origin = 'openconfig'
+                        xpath = xpath.replace(pfx + ':', '')
+                        if isinstance(value, string_types):
+                            value = value.replace(pfx + ':', '')
                     if edit_op:
                         if edit_op in ['create', 'merge', 'replace']:
                             xpath_lst = xpath.split('/')
@@ -144,7 +147,7 @@ class XEClient(Client):
                                 message['delete'] = set(xpath)
                     else:
                         message['get'].append(xpath)
-        return namespace_modules, message
+        return namespace_modules, message, origin
 
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
@@ -203,14 +206,14 @@ class XEClient(Client):
 
         def check_configs(configs):
             if isinstance(configs, string_types):
-                logging.debug("Handling as JSON string.")
+                logger.debug("Handling as JSON string.")
                 try:
                     configs = json.loads(configs)
                 except:
                     raise Exception("{0}\n is invalid JSON!".format(configs))
                 configs = [configs]
             elif isinstance(configs, dict):
-                logging.debug("Handling already serialized JSON object.")
+                logger.debug("Handling already serialized JSON object.")
                 configs = [configs]
             elif not isinstance(configs, (list, set)):
                 raise Exception(
@@ -249,7 +252,7 @@ class XEClient(Client):
         replaces = create_updates(replace_json_configs)
         return self.set(updates=updates, replaces=replaces)
 
-    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
+    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF", origin=None):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
 
         Parameters
@@ -278,13 +281,16 @@ class XEClient(Client):
         )
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
+            gnmi_path = []
+            for xpath in set(xpaths):
+                gnmi_path.append(self.parse_xpath_to_gnmi_path(xpath, origin))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
+            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths, origin)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
+        logger.info('GNMI get:\n{0}\n{1}'.format(9 * '=', str(gnmi_path)))
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def subscribe_xpaths(

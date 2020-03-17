@@ -98,11 +98,13 @@ class NXClient(Client):
                         if pfx in xpath and 'openconfig' in ns:
                             origin = 'openconfig'
                             xpath = xpath.replace(pfx + ':', '')
-                            value = value.replace(pfx + ':', '')
+                            if isinstance(value, string_types):
+                                value = value.replace(pfx + ':', '')
                         elif pfx in xpath and 'device' in ns:
                             origin = 'device'
                             xpath = xpath.replace(pfx + ':', '')
-                            value = value.replace(pfx + ':', '')
+                            if isinstance(value, string_types):
+                                value = value.replace(pfx + ':', '')
                     if edit_op:
                         if edit_op in ['create', 'merge', 'replace']:
                             xpath_lst = xpath.split('/')
