@@ -92,6 +92,7 @@ class XEClient(Client):
             return paths
         else:
             namespace_modules = {}
+            origin = None
             for prefix, nspace in request.get('namespace', {}).items():
                 module = ''
                 if '/Cisco-IOS-' in nspace:
@@ -106,7 +107,7 @@ class XEClient(Client):
                     namespace_modules[prefix] = module
             for node in request.get('nodes', []):
                 if 'xpath' not in node:
-                    log.error('Xpath is not in message')
+                    logger.error('Xpath is not in message')
                 else:
                     xpath = node['xpath']
                     value = node.get('value', '')
