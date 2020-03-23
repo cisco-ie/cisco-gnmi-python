@@ -342,6 +342,19 @@ class Client(object):
         return path
 
     def combine_configs(self, payload, last_xpath, xpath, config):
+        """Walking from end to finish 2 xpaths merge so combine them
+
+            |---last xpath config
+        ----|
+            |---this xpath config
+
+        Parameters
+        ----------
+        payload: dict of partial payload
+        last_xpath: last xpath that was processed
+        xpath: colliding xpath
+        config: dict of values associated to colliding xpath
+        """
         last_set = set(last_xpath.split('/'))
         curr_diff = set(xpath.split('/')) - last_set
         if len(curr_diff) > 1:
@@ -368,6 +381,18 @@ class Client(object):
         return payload
 
     def xpath_to_json(self, configs, last_xpath='', payload={}):
+        """Try to combine Xpaths/values into a common payload (recursive).
+
+        Parameters
+        ----------
+        configs: tuple of xpath/value dict
+        last_xpath: str of last xpath that was recusivly processed.
+        payload: dict being recursively built for JSON transformation.
+
+        Returns
+        -------
+        dict of combined xpath/value dict.
+        """
         for i, cfg in enumerate(configs, 1):
             xpath, config, is_key = cfg
             if last_xpath and xpath not in last_xpath:
@@ -408,6 +433,12 @@ class Client(object):
     RE_FIND_KEYS = re.compile(r'\[.*?\]')
 
     def get_payload(self, configs):
+        """Common Xpaths were detected so try to consolidate them.
+
+        Parameter
+        ---------
+        configs: tuple of xpath/value dicts
+        """
         # Number of updates are limited so try to consolidate into lists.
         xpaths_cfg = []
         first_key = set()

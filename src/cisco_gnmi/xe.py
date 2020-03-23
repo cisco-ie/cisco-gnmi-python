@@ -80,6 +80,26 @@ class XEClient(Client):
     """
 
     def xpath_to_path_elem(self, request):
+        """Helper function for Cisco XE clients.
+
+        Parameters
+        ---------
+        request: dict containing request namespace and nodes to be worked on.
+            namespace: dict of <prefix>: <namespace>
+            nodes: list of dict
+                  <xpath>: Xpath pointing to resource
+                  <value>: value to set resource to
+                  <edit-op>: equivelant NETCONF edit-config operation
+
+        Returns
+        -------
+        tuple: namespace_modules, message dict, origin
+            namespace_modules: dict of <prefix>: <module name>
+                Needed for future support.
+            message dict: 4 lists containing possible updates, replaces,
+                deletes, or gets derived form input nodes.
+            origin str: openconfig if detected (XE uses rfc7951 by default)
+        """
         paths = []
         message = {
             'update': [],
@@ -201,6 +221,26 @@ class XEClient(Client):
         return configs
 
     def create_updates(self, configs, origin, json_ietf=True):
+        """Check configs, and construct "Update" messages.
+
+        Parameters
+        ----------
+        configs: dict of <xpath>: <dict val for JSON>
+        origin: None or 'openconfig'
+        json_ietf: bool encoding type for Update val (default True)
+
+        Returns
+        -------
+        List of Update messages with val populated.
+
+        If a set of configs contain a common Xpath, the Update must contain
+        a consolidation of xpath/values for 2 reasons:
+
+        1. Devices may have a restriction on how many Update messages it will
+           accept at once.
+        2. Some xpath/values are required to be set in same Update because of
+           dependencies like leafrefs, mandatory settings, and if/when/musts.
+        """
         if not configs:
             return None
         configs = self.check_configs(configs)
