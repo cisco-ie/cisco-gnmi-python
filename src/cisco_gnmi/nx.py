@@ -188,7 +188,7 @@ class NXClient(Client):
 
     def create_updates(self, configs, origin, json_ietf=False):
         if not configs:
-            return None
+            return []
         configs = self.check_configs(configs)
 
         xpaths = []
