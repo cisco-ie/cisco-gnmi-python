@@ -42,7 +42,11 @@ def main():
         logging.error("%s not in supported RPCs: %s!", args.rpc, ', '.join(rpc_map.keys()))
         parser.print_help()
         exit(1)
-    rpc_map[args.rpc]()
+    try:
+        rpc_map[args.rpc]()
+    except:
+        logging.exception("Error during usage!")
+        exit(1)
 
 def gnmi_capabilities():
     parser = argparse.ArgumentParser(
@@ -124,6 +128,9 @@ def gnmi_subscribe():
         logging.exception("Stopping due to exception!")
 
 def gnmi_get():
+    """Provides Get RPC usage. Assumes JSON or JSON_IETF style configurations.
+    TODO: This is the least well understood/implemented. Need to validate if there is an OOO for update/replace/delete.
+    """
     parser = argparse.ArgumentParser(
         description="Performs Get RPC against network element."
     )
@@ -163,12 +170,71 @@ def gnmi_get():
     logging.info(formatted_message)
 
 def gnmi_set():
+    """Provides Set RPC usage. Assumes JSON or JSON_IETF style configurations.
+    Applies update/replace operations, and then delete operations.
+    TODO: This is the least well understood/implemented. Need to validate if there is an OOO for update/replace/delete.
+    """
     parser = argparse.ArgumentParser(
         description="Performs Set RPC against network element."
     )
+    parser.add_argument(
+        "-update_json_config",
+        description="JSON-modeled config to apply as an update."
+    )
+    parser.add_argument(
+        "-replace_json_config",
+        description="JSON-modeled config to apply as an update."
+    )
+    parser.add_argument(
+        "-delete_xpath",
+        help="XPaths to delete.",
+        type=str,
+        action="append"
+    )
+    parser.add_argument(
+        "-no_ietf",
+        help="JSON is not IETF conformant.",
+        action="store_true"
+    )
+    parser.add_argument(
+        "-dump_json",
+        help="Dump as JSON instead of textual protos.",
+        action="store_true"
+    )
     args = __common_args_handler(parser)
+    if not any([args.update_json_config, args.replace_json_config, args.delete_xpath]):
+        raise Exception("Must specify update, replace, or delete parameters!")
+    def load_json_file(filename):
+        config = None
+        with open(filename, "r") as config_fd:
+            config = json.load(config_fd)
+        return config
+    kwargs = {}
+    if args.update_json_config:
+        kwargs["update_json_configs"] = load_json_file(args.update_json_config)
+    if args.replace_json_config:
+        kwargs["replace_json_configs"] = load_json_file(args.replace_json_config)
+    if args.no_ietf:
+        kwargs["ietf"] = False
     client = __gen_client(args)
-
+    set_response = client.set_json(**kwargs)
+    formatted_message = None
+    if args.dump_json:
+        formatted_message = json_format.MessageToJson(set_response, sort_keys=True)
+    else:
+        formatted_message = text_format.MessageToString(set_response)
+    logging.info(formatted_message)
+    if args.delete_xpath:
+        if getattr(client, "delete_xpaths", None) is not None:
+            delete_response = client.delete_xpaths(args.xpath)
+            formatted_message = None
+            if args.dump_json:
+                formatted_message = json_format.MessageToJson(delete_response, sort_keys=True)
+            else:
+                formatted_message = text_format.MessageToString(delete_response)
+            logging.info(formatted_message)
+        else:
+            raise Exception("Convenience delete_xpaths is not supported in the client library!")
 
 def __gen_client(args):
     builder = ClientBuilder(args.netloc)
