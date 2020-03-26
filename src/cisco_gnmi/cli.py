@@ -55,6 +55,11 @@ gnmcli <rpc> [<args>]
 Supported RPCs:
 {supported_rpcs}
 
+gnmcli capabilities 127.0.0.1:57500
+gnmcli get 127.0.0.1:57500 -xpath /interfaces/interface/state/counters
+gnmcli set 127.0.0.1:57500 -update_json_config newconfig.json
+gnmcli subscribe 127.0.0.1:57500 -xpath /interfaces/interface/state/counters -dump_file intfcounters.proto.txt
+
 See <rpc> --help for RPC options.
     """.format(
             supported_rpcs="\n".join(list(rpc_map.keys()))
@@ -97,7 +102,7 @@ def gnmi_subscribe():
     )
     parser.add_argument(
         "-interval",
-        help="Sample interval in seconds for Subscription.",
+        help="Sample interval in seconds for Subscription. Defaults to 10.",
         type=int,
         default=10,
     )
@@ -117,7 +122,7 @@ def gnmi_subscribe():
     )
     parser.add_argument(
         "-encoding",
-        help="gNMI subscription encoding.",
+        help="gNMI Encoding.",
         type=str,
         nargs="?",
         choices=proto.gnmi_pb2.Encoding.keys(),
@@ -169,7 +174,7 @@ def gnmi_get():
     parser.add_argument("-xpath", help="XPaths to Get.", type=str, action="append")
     parser.add_argument(
         "-encoding",
-        help="gNMI subscription encoding.",
+        help="gNMI Encoding.",
         type=str,
         nargs="?",
         choices=proto.gnmi_pb2.Encoding.keys(),
@@ -214,7 +219,7 @@ def gnmi_set():
         "-update_json_config", help="JSON-modeled config to apply as an update."
     )
     parser.add_argument(
-        "-replace_json_config", help="JSON-modeled config to apply as an update."
+        "-replace_json_config", help="JSON-modeled config to apply as a replace."
     )
     parser.add_argument(
         "-delete_xpath", help="XPaths to delete.", type=str, action="append"
@@ -237,16 +242,17 @@ def gnmi_set():
             config = json.load(config_fd)
         return config
 
-    kwargs = {}
-    if args.update_json_config:
-        kwargs["update_json_configs"] = load_json_file(args.update_json_config)
-    if args.replace_json_config:
-        kwargs["replace_json_configs"] = load_json_file(args.replace_json_config)
-    if args.no_ietf:
-        kwargs["ietf"] = False
-    client = __gen_client(args)
-    set_response = client.set_json(**kwargs)
-    logging.info(__format_message(set_response))
+    if args.update_json_config or args.replace_json_config:
+        kwargs = {}
+        if args.update_json_config:
+            kwargs["update_json_configs"] = load_json_file(args.update_json_config)
+        if args.replace_json_config:
+            kwargs["replace_json_configs"] = load_json_file(args.replace_json_config)
+        if args.no_ietf:
+            kwargs["ietf"] = False
+        client = __gen_client(args)
+        set_response = client.set_json(**kwargs)
+        logging.info(__format_message(set_response))
     if args.delete_xpath:
         if getattr(client, "delete_xpaths", None) is not None:
             delete_response = client.delete_xpaths(args.xpath)
@@ -288,7 +294,7 @@ def __common_args_handler(parser):
     parser.add_argument("netloc", help="<host>:<port>", type=str)
     parser.add_argument(
         "-os",
-        help="OS to use.",
+        help="OS wrapper to utilize. Defaults to IOS XR.",
         type=str,
         default="IOS XR",
         choices=list(ClientBuilder.os_class_map.keys()),
@@ -303,10 +309,10 @@ def __common_args_handler(parser):
     parser.add_argument("-ssl_target_override", help="gRPC SSL target override option.")
     parser.add_argument(
         "-auto_ssl_target_override",
-        help="Root certificates for secure connection.",
+        help="Use root_certificates first CN as grpc.ssl_target_name_override.",
         action="store_true",
     )
-    parser.add_argument("-debug", help="Print debug messages", action="store_true")
+    parser.add_argument("-debug", help="Print debug messages.", action="store_true")
     args = parser.parse_args(sys.argv[2:])
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     args.username = input("Username: ")
