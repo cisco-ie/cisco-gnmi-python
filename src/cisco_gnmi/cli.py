@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 """
+Wraps gNMI RPCs with a reasonably useful CLI for interacting with network elements.
+
+
 Command parsing sourced from this wonderful blog by Chase Seibert
 https://chase-seibert.github.io/blog/2014/03/21/python-multilevel-argparse.html
 """
@@ -8,7 +11,8 @@ import logging
 import argparse
 from getpass import getpass
 from google.protobuf import json_format, text_format
-from . import ClientBuilder
+from . import ClientBuilder, proto
+from google.protobuf.internal import enum_type_wrapper
 import sys
 
 
@@ -69,7 +73,7 @@ def gnmi_subscribe():
     )
     parser.add_argument(
         "-dump_file",
-        help="Filename to dump to.",
+        help="Filename to dump to. Defaults to stdout.",
         type=str,
         default="stdout"
     )
@@ -82,24 +86,28 @@ def gnmi_subscribe():
         "-sync_stop", help="Stop on sync_response.", action="store_true"
     )
     parser.add_argument(
-        "-encoding", help="gNMI subscription encoding.", type=str, nargs="?"
+        "-encoding", help="gNMI subscription encoding.", type=str, nargs="?", choices=list(proto.gnmi_pb2.Encoding.keys())
     )
     args = __common_args_handler(parser)
-    # Set default XPath outside of argparse
+    # Set default XPath outside of argparse due to default being persistent in argparse.
     if not args.xpath:
         args.xpath = ["/interfaces/interface/state/counters"]
     client = __gen_client(args)
+    # Take care not to override options unnecessarily.
     kwargs = {}
     if args.encoding:
         kwargs["encoding"] = args.encoding
     if args.sample_interval:
         kwargs["sample_interval"] = args.sample_interval
     try:
-        logging.info("Subscribing to %s ...", args.xpath)
+        logging.info("Dumping responses to %s as %s ...", args.dump_file, "JSON" if args.dump_json else "textual proto")
+        logging.info("Subscribing to:\n%s", '\n'.join(args.xpath))
         for subscribe_response in client.subscribe_xpaths(args.xpath, **kwargs):
-            if subscribe_response.sync_response and args.sync_stop:
-                logging.warning("Stopping on sync_response.")
-                break
+            if subscribe_response.sync_response:
+                logging.debug("sync_response received.")
+                if args.sync_stop:
+                    logging.warning("Stopping on sync_response.")
+                    break
             formatted_message = None
             if args.dump_json:
                 formatted_message = json_format.MessageToJson(subscribe_response, sort_keys=True)
@@ -119,8 +127,40 @@ def gnmi_get():
     parser = argparse.ArgumentParser(
         description="Performs Get RPC against network element."
     )
+    parser.add_argument(
+        "-xpath",
+        help="XPaths to Get.",
+        type=str,
+        action="append"
+    )
+    parser.add_argument(
+        "-encoding", help="gNMI subscription encoding.", type=str, nargs="?", choices=list(proto.gnmi_pb2.Encoding.keys())
+    )
+    parser.add_argument(
+        "-data_type", help="gNMI GetRequest DataType", type=str, nargs="?", choices=list(enum_type_wrapper.EnumTypeWrapper(proto.gnmi_pb2._GETREQUEST_DATATYPE).keys())
+    )
+    parser.add_argument(
+        "-dump_json",
+        help="Dump as JSON instead of textual protos.",
+        action="store_true"
+    )
     args = __common_args_handler(parser)
+    # Set default XPath outside of argparse due to default being persistent in argparse.
+    if not args.xpath:
+        args.xpath = ["/interfaces/interface/state/counters"]
     client = __gen_client(args)
+    kwargs = {}
+    if args.encoding:
+        kwargs["encoding"] = args.encoding
+    if args.data_type:
+        kwargs["data_type"] = args.data_type
+    get_response = client.get_xpaths(args.xpath, **kwargs)
+    formatted_message = None
+    if args.dump_json:
+        formatted_message = json_format.MessageToJson(get_response, sort_keys=True)
+    else:
+        formatted_message = text_format.MessageToString(get_response)
+    logging.info(formatted_message)
 
 def gnmi_set():
     parser = argparse.ArgumentParser(
