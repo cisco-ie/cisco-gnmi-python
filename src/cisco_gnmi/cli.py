@@ -45,37 +45,102 @@ def gnmi_capabilities():
         description="Performs Capabilities RPC against network element."
     )
     args = __common_args_handler(parser)
+    client = __gen_client(args)
+    logging.info(client.capabilities())
 
 def gnmi_subscribe():
+    """Performs a sampled Subscribe against network element.
+    TODO: ON_CHANGE
+    """
     parser = argparse.ArgumentParser(
         description="Performs Subscribe RPC against network element."
     )
+    parser.add_argument(
+        "-xpath",
+        help="XPath to subscribe to.",
+        type=str,
+        action="append"
+    )
+    parser.add_argument(
+        "-interval",
+        help="Sample interval in seconds for Subscription.",
+        type=int,
+        default=10*int(1e9)
+    )
+    parser.add_argument(
+        "-dump_file",
+        help="Filename to dump to.",
+        type=str,
+        default="stdout"
+    )
+    parser.add_argument(
+        "-dump_json",
+        help="Dump as JSON instead of textual protos.",
+        action="store_true"
+    )
+    parser.add_argument(
+        "-sync_stop", help="Stop on sync_response.", action="store_true"
+    )
+    parser.add_argument(
+        "-encoding", help="gNMI subscription encoding.", type=str, nargs="?"
+    )
     args = __common_args_handler(parser)
-    pass
+    # Set default XPath outside of argparse
+    if not args.xpath:
+        args.xpath = ["/interfaces/interface/state/counters"]
+    client = __gen_client(args)
+    kwargs = {}
+    if args.encoding:
+        kwargs["encoding"] = args.encoding
+    if args.sample_interval:
+        kwargs["sample_interval"] = args.sample_interval
+    try:
+        logging.info("Subscribing to %s ...", args.xpath)
+        for subscribe_response in client.subscribe_xpaths(args.xpath, **kwargs):
+            if subscribe_response.sync_response and args.sync_stop:
+                logging.warning("Stopping on sync_response.")
+                break
+            formatted_message = None
+            if args.dump_json:
+                formatted_message = json_format.MessageToJson(subscribe_response, sort_keys=True)
+            else:
+                formatted_message = text_format.MessageToString(subscribe_response)
+            if args.dump_file == "stdout":
+                logging.info(formatted_message)
+            else:
+                with open(args.dump_file, "a") as dump_fd:
+                    dump_fd.write(formatted_message)
+    except KeyboardInterrupt:
+        logging.warning("Stopping on interrupt.")
+    except Exception:
+        logging.exception("Stopping due to exception!")
 
 def gnmi_get():
     parser = argparse.ArgumentParser(
         description="Performs Get RPC against network element."
     )
     args = __common_args_handler(parser)
+    client = __gen_client(args)
 
 def gnmi_set():
     parser = argparse.ArgumentParser(
         description="Performs Set RPC against network element."
     )
     args = __common_args_handler(parser)
+    client = __gen_client(args)
 
-def __gen_client(netloc, os_name, username, password, root_certificates=None, private_key=None, certificate_chain=None, ssl_target_override=None, auto_ssl_target_override=False):
-    builder = ClientBuilder(netloc)
-    builder.set_os(os_name)
-    builder.set_call_authentication(username, password)
-    if not any([root_certificates, private_key, certificate_chain]):
+
+def __gen_client(args):
+    builder = ClientBuilder(args.netloc)
+    builder.set_os(args.os)
+    builder.set_call_authentication(args.username, args.password)
+    if not any([args.root_certificates, args.private_key, args.certificate_chain]):
         builder.set_secure_from_target()
     else:
-        builder.set_secure_from_file(root_certificates, private_key, certificate_chain)
-    if ssl_target_override:
-        builder.set_ssl_target_override(ssl_target_override)
-    elif auto_ssl_target_override:
+        builder.set_secure_from_file(args.root_certificates, args.private_key, args.certificate_chain)
+    if args.ssl_target_override:
+        builder.set_ssl_target_override(args.ssl_target_override)
+    elif args.auto_ssl_target_override:
         builder.set_ssl_target_override()
     return builder.construct()
 
