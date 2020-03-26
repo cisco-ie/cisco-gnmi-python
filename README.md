@@ -185,7 +185,7 @@ If a new `gnmi.proto` definition is released, use `update_protos.sh` to recompil
 ./update_protos.sh
 ```
 
-### gnmicli Usage
+### gnmcli Usage
 The below details the current `gnmcli` usage options.
 
 ```
@@ -212,6 +212,11 @@ optional arguments:
 ```
 
 #### Capabilities
+This command will output the `CapabilitiesResponse` to `stdout`.
+```
+gnmcli capabilities 127.0.0.1:57500 -auto_ssl_target_override
+```
+
 ```
 gnmcli capabilities --help
 usage: gnmcli [-h] [-os {None,IOS XR,NX-OS,IOS XE}]
@@ -245,6 +250,11 @@ optional arguments:
 ```
 
 #### Get
+This command will output the `GetResponse` to `stdout`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`.
+```
+gnmcli get 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+```
+
 ```
 gnmcli get --help
 usage: gnmcli [-h] [-xpath XPATH]
@@ -287,7 +297,11 @@ optional arguments:
 ```
 
 #### Subscribe
-Subscribe currently only supports a sampled stream. `ON_CHANGE` is possible but not implemented in the CLI, yet. :)
+This command will output the `SubscribeResponse` to `stdout` or `-dump_file`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`. Subscribe currently only supports a sampled stream. `ON_CHANGE` is possible but not implemented in the CLI, yet. :)
+```
+gnmcli subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+```
+
 ```
 gnmcli subscribe --help
 usage: gnmcli [-h] [-xpath XPATH] [-interval INTERVAL] [-dump_file DUMP_FILE]
@@ -331,6 +345,7 @@ optional arguments:
 ```
 
 #### Set
+This command has not been validated.
 ```
 gnmcli set --help
 usage: gnmcli [-h] [-update_json_config UPDATE_JSON_CONFIG]
