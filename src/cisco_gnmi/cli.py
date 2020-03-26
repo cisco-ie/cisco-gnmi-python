@@ -211,10 +211,10 @@ def gnmi_set():
         description="Performs Set RPC against network element."
     )
     parser.add_argument(
-        "-update_json_config", description="JSON-modeled config to apply as an update."
+        "-update_json_config", help="JSON-modeled config to apply as an update."
     )
     parser.add_argument(
-        "-replace_json_config", description="JSON-modeled config to apply as an update."
+        "-replace_json_config", help="JSON-modeled config to apply as an update."
     )
     parser.add_argument(
         "-delete_xpath", help="XPaths to delete.", type=str, action="append"
