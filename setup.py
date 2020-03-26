@@ -69,4 +69,5 @@ setup(
             "coverage",
         ],
     },
+    entry_points={"console_scripts": ["gnmcli = cisco_gnmi.cli:main"]},
 )
