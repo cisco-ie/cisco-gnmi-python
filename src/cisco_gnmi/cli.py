@@ -50,21 +50,17 @@ def main():
     parser = argparse.ArgumentParser(
         description="gNMI CLI demonstrating library usage.",
         usage="""
-    gnmcli <rpc> [<args>]
+gnmcli <rpc> [<args>]
 
-    Supported RPCs:
-    %s
+Supported RPCs:
+{supported_rpcs}
 
-    See --help for RPC options.
+See <rpc> --help for RPC options.
     """.format(
-            "\n".join(rpc_map.keys())
+            supported_rpcs="\n".join(list(rpc_map.keys()))
         ),
     )
     parser.add_argument("rpc", help="gNMI RPC to perform against network element.")
-    if len(sys.argv) < 2:
-        logging.error("Must at minimum provide RPC and required arguments!")
-        parser.print_help()
-        exit(1)
     args = parser.parse_args(sys.argv[1:2])
     if args.rpc not in rpc_map.keys():
         logging.error(
@@ -74,7 +70,7 @@ def main():
         exit(1)
     try:
         rpc_map[args.rpc]()
-    except:
+    except Exception:
         logging.exception("Error during usage!")
         exit(1)
 
@@ -103,7 +99,7 @@ def gnmi_subscribe():
         "-interval",
         help="Sample interval in seconds for Subscription.",
         type=int,
-        default=10 * int(1e9),
+        default=10,
     )
     parser.add_argument(
         "-dump_file",
@@ -124,7 +120,7 @@ def gnmi_subscribe():
         help="gNMI subscription encoding.",
         type=str,
         nargs="?",
-        choices=list(proto.gnmi_pb2.Encoding.keys()),
+        choices=proto.gnmi_pb2.Encoding.keys(),
     )
     args = __common_args_handler(parser)
     # Set default XPath outside of argparse due to default being persistent in argparse.
@@ -135,8 +131,8 @@ def gnmi_subscribe():
     kwargs = {}
     if args.encoding:
         kwargs["encoding"] = args.encoding
-    if args.sample_interval:
-        kwargs["sample_interval"] = args.sample_interval
+    if args.interval:
+        kwargs["sample_interval"] = args.interval * int(1e9)
     try:
         logging.info(
             "Dumping responses to %s as %s ...",
@@ -145,6 +141,7 @@ def gnmi_subscribe():
         )
         logging.info("Subscribing to:\n%s", "\n".join(args.xpath))
         for subscribe_response in client.subscribe_xpaths(args.xpath, **kwargs):
+            logging.debug("SubscribeResponse received.")
             if subscribe_response.sync_response:
                 logging.debug("sync_response received.")
                 if args.sync_stop:
@@ -175,18 +172,16 @@ def gnmi_get():
         help="gNMI subscription encoding.",
         type=str,
         nargs="?",
-        choices=list(proto.gnmi_pb2.Encoding.keys()),
+        choices=proto.gnmi_pb2.Encoding.keys(),
     )
     parser.add_argument(
         "-data_type",
         help="gNMI GetRequest DataType",
         type=str,
         nargs="?",
-        choices=list(
-            enum_type_wrapper.EnumTypeWrapper(
-                proto.gnmi_pb2._GETREQUEST_DATATYPE
-            ).keys()
-        ),
+        choices=enum_type_wrapper.EnumTypeWrapper(
+            proto.gnmi_pb2._GETREQUEST_DATATYPE
+        ).keys(),
     )
     parser.add_argument(
         "-dump_json",
@@ -299,20 +294,16 @@ def __common_args_handler(parser):
         choices=list(ClientBuilder.os_class_map.keys()),
     )
     parser.add_argument(
-        "-root_certificates", description="Root certificates for secure connection."
+        "-root_certificates", help="Root certificates for secure connection."
     )
+    parser.add_argument("-private_key", help="Private key for secure connection.")
     parser.add_argument(
-        "-private_key", description="Private key for secure connection."
+        "-certificate_chain", help="Certificate chain for secure connection."
     )
-    parser.add_argument(
-        "-certificate_chain", description="Certificate chain for secure connection."
-    )
-    parser.add_argument(
-        "-ssl_target_override", description="gRPC SSL target override option."
-    )
+    parser.add_argument("-ssl_target_override", help="gRPC SSL target override option.")
     parser.add_argument(
         "-auto_ssl_target_override",
-        description="Root certificates for secure connection.",
+        help="Root certificates for secure connection.",
         action="store_true",
     )
     parser.add_argument("-debug", help="Print debug messages", action="store_true")
