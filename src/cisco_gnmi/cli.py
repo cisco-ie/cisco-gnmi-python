@@ -48,17 +48,17 @@ def main():
         "set": gnmi_set,
     }
     parser = argparse.ArgumentParser(
-        description="gNMI CLI demonstrating library usage.",
+        description="gNMI CLI demonstrating cisco_gnmi library usage.",
         usage="""
-gnmcli <rpc> [<args>]
+cisco-gnmi <rpc> [<args>]
 
 Supported RPCs:
 {supported_rpcs}
 
-gnmcli capabilities 127.0.0.1:57500
-gnmcli get 127.0.0.1:57500 -xpath /interfaces/interface/state/counters
-gnmcli set 127.0.0.1:57500 -update_json_config newconfig.json
-gnmcli subscribe 127.0.0.1:57500 -xpath /interfaces/interface/state/counters -dump_file intfcounters.proto.txt
+cisco-gnmi capabilities 127.0.0.1:57500
+cisco-gnmi get 127.0.0.1:57500 -xpath /interfaces/interface/state/counters
+cisco-gnmi set 127.0.0.1:57500 -update_json_config newconfig.json
+cisco-gnmi subscribe 127.0.0.1:57500 -xpath /interfaces/interface/state/counters -dump_file intfcounters.proto.txt
 
 See <rpc> --help for RPC options.
     """.format(

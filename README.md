@@ -8,15 +8,15 @@ This library wraps gNMI functionality to ease usage with Cisco implementations i
 ```bash
 pip install cisco-gnmi
 python -c "import cisco_gnmi; print(cisco_gnmi)"
-gnmcli --help
+cisco-gnmi --help
 ```
 
-This library covers the gNMI defined `Capabilities`, `Get`, `Set`, and `Subscribe` RPCs, and helper clients provide OS-specific recommendations. A CLI is also available. As commonalities and differences are identified between OS functionality this library will be refactored as necessary.
+This library covers the gNMI defined `Capabilities`, `Get`, `Set`, and `Subscribe` RPCs, and helper clients provide OS-specific recommendations. A CLI (`cisco-gnmi`) is also available upon installation. As commonalities and differences are identified between OS functionality this library will be refactored as necessary.
 
 It is *highly* recommended that users of the library learn [Google Protocol Buffers](https://developers.google.com/protocol-buffers/) syntax to significantly ease usage. Understanding how to read Protocol Buffers, and reference [`gnmi.proto`](https://github.com/openconfig/gnmi/blob/master/proto/gnmi/gnmi.proto), will be immensely useful for utilizing gNMI and any other gRPC interface.
 
-### gnmcli
-Since `v1.0.5` a gNMI CLI is available when this module is installed. `Capabilities`, `Get`, rudimentary `Set`, and `Subscribe` are supported. The CLI may be useful for simply interacting with a Cisco gNMI service, and also serves as a reference for how to use this `cisco_gnmi` library. CLI usage is documented at the bottom of this README in [gnmcli Usage](#gnmcli-usage).
+### cisco-gnmi CLI
+Since `v1.0.5` a gNMI CLI is available as `cisco-gnmi` when this module is installed. `Capabilities`, `Get`, rudimentary `Set`, and `Subscribe` are supported. The CLI may be useful for simply interacting with a Cisco gNMI service, and also serves as a reference for how to use this `cisco_gnmi` library. CLI usage is documented at the bottom of this README in [CLI Usage](#cli-usage).
 
 ### ClientBuilder
 Since `v1.0.0` a builder pattern is available with `ClientBuilder`. `ClientBuilder` provides several `set_*` methods which define the intended `Client` connectivity and a `construct` method to construct and return the desired `Client`. There are several major methods involved here:
@@ -185,13 +185,13 @@ If a new `gnmi.proto` definition is released, use `update_protos.sh` to recompil
 ./update_protos.sh
 ```
 
-### gnmcli Usage
-The below details the current `gnmcli` usage options. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
+### CLI Usage
+The below details the current `cisco-gnmi` usage options. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
 
 ```
-gnmcli --help
+cisco-gnmi --help
 usage:
-gnmcli <rpc> [<args>]
+cisco-gnmi <rpc> [<args>]
 
 Supported RPCs:
 capabilities
@@ -199,10 +199,10 @@ subscribe
 get
 set
 
-gnmcli capabilities 127.0.0.1:57500
-gnmcli get 127.0.0.1:57500
-gnmcli set 127.0.0.1:57500 -delete_xpath Cisco-IOS-XR-shellutil-cfg:host-names/host-name
-gnmcli subscribe 127.0.0.1:57500 -debug -auto_ssl_target_override -dump_file intfcounters.proto.txt
+cisco-gnmi capabilities 127.0.0.1:57500
+cisco-gnmi get 127.0.0.1:57500
+cisco-gnmi set 127.0.0.1:57500 -delete_xpath Cisco-IOS-XR-shellutil-cfg:host-names/host-name
+cisco-gnmi subscribe 127.0.0.1:57500 -debug -auto_ssl_target_override -dump_file intfcounters.proto.txt
 
 See <rpc> --help for RPC options.
 
@@ -219,12 +219,12 @@ optional arguments:
 #### Capabilities
 This command will output the `CapabilitiesResponse` to `stdout`.
 ```
-gnmcli capabilities 127.0.0.1:57500 -auto_ssl_target_override
+cisco-gnmi capabilities 127.0.0.1:57500 -auto_ssl_target_override
 ```
 
 ```
-gnmcli capabilities --help
-usage: gnmcli [-h] [-os {None,IOS XR,NX-OS,IOS XE}]
+cisco-gnmi capabilities --help
+usage: cisco-gnmi [-h] [-os {None,IOS XR,NX-OS,IOS XE}]
               [-root_certificates ROOT_CERTIFICATES]
               [-private_key PRIVATE_KEY]
               [-certificate_chain CERTIFICATE_CHAIN]
@@ -258,11 +258,11 @@ optional arguments:
 #### Get
 This command will output the `GetResponse` to `stdout`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`.
 ```
-gnmcli get 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+cisco-gnmi get 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
 ```
 
 ```
-usage: gnmcli [-h] [-xpath XPATH]
+usage: cisco-gnmi [-h] [-xpath XPATH]
               [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
               [-data_type [{ALL,CONFIG,STATE,OPERATIONAL}]] [-dump_json]
               [-os {None,IOS XR,NX-OS,IOS XE}]
@@ -305,7 +305,7 @@ optional arguments:
 #### Set
 This command has not been validated. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
 ```
-usage: gnmcli [-h] [-update_json_config UPDATE_JSON_CONFIG]
+usage: cisco-gnmi [-h] [-update_json_config UPDATE_JSON_CONFIG]
               [-replace_json_config REPLACE_JSON_CONFIG]
               [-delete_xpath DELETE_XPATH] [-no_ietf] [-dump_json]
               [-os {None,IOS XR,NX-OS,IOS XE}]
@@ -350,12 +350,12 @@ optional arguments:
 #### Subscribe
 This command will output the `SubscribeResponse` to `stdout` or `-dump_file`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`. Subscribe currently only supports a sampled stream. `ON_CHANGE` is possible but not implemented in the CLI, yet. :)
 ```
-gnmcli subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+cisco-gnmi subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
 ```
 
 ```
-gnmcli subscribe --help
-usage: gnmcli [-h] [-xpath XPATH] [-interval INTERVAL] [-dump_file DUMP_FILE]
+cisco-gnmi subscribe --help
+usage: cisco-gnmi [-h] [-xpath XPATH] [-interval INTERVAL] [-dump_file DUMP_FILE]
               [-dump_json] [-sync_stop]
               [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
               [-os {None,IOS XR,NX-OS,IOS XE}]
