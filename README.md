@@ -4,6 +4,36 @@
 
 This library wraps gNMI functionality to ease usage with Cisco implementations in Python programs. Derived from [openconfig/gnmi](https://github.com/openconfig/gnmi/tree/master/proto).
 
+- [cisco-gnmi-python](#cisco-gnmi-python)
+  - [Usage](#usage)
+    - [cisco-gnmi CLI](#cisco-gnmi-cli)
+    - [ClientBuilder](#clientbuilder)
+      - [Initialization Examples](#initialization-examples)
+    - [Client](#client)
+    - [NXClient](#nxclient)
+    - [XEClient](#xeclient)
+    - [XRClient](#xrclient)
+  - [gNMI](#gnmi)
+  - [Development](#development)
+    - [Get Source](#get-source)
+    - [Code Hygiene](#code-hygiene)
+    - [Recompile Protobufs](#recompile-protobufs)
+  - [CLI Usage](#cli-usage)
+    - [Capabilities](#capabilities)
+      - [Usage](#usage-1)
+      - [Output](#output)
+    - [Get](#get)
+      - [Usage](#usage-2)
+      - [Output](#output-1)
+    - [Set](#set)
+      - [Usage](#usage-3)
+    - [Subscribe](#subscribe)
+      - [Usage](#usage-4)
+      - [Output](#output-2)
+  - [Licensing](#licensing)
+  - [Issues](#issues)
+  - [Related Projects](#related-projects)
+
 ## Usage
 ```bash
 pip install cisco-gnmi
@@ -185,7 +215,7 @@ If a new `gnmi.proto` definition is released, use `update_protos.sh` to recompil
 ./update_protos.sh
 ```
 
-### CLI Usage
+## CLI Usage
 The below details the current `cisco-gnmi` usage options. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
 
 ```
@@ -216,12 +246,13 @@ optional arguments:
   -h, --help  show this help message and exit
 ```
 
-#### Capabilities
+### Capabilities
 This command will output the `CapabilitiesResponse` to `stdout`.
 ```
 cisco-gnmi capabilities 127.0.0.1:57500 -auto_ssl_target_override
 ```
 
+#### Usage
 ```
 cisco-gnmi capabilities --help
 usage: cisco-gnmi [-h] [-os {None,IOS XR,NX-OS,IOS XE}]
@@ -255,12 +286,27 @@ optional arguments:
   -debug                Print debug messages.
 ```
 
-#### Get
+#### Output
+```
+[cisco-gnmi-python] cisco-gnmi capabilities redacted:57500 -auto_ssl_target_override
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:supported_models {
+  name: "Cisco-IOS-XR-qos-ma-oper"
+  organization: "Cisco Systems, Inc."
+  version: "2019-04-05"
+}
+...
+```
+
+### Get
 This command will output the `GetResponse` to `stdout`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`.
 ```
 cisco-gnmi get 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
 ```
 
+#### Usage
 ```
 usage: cisco-gnmi [-h] [-xpath XPATH]
               [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
@@ -302,8 +348,37 @@ optional arguments:
   -debug                Print debug messages.
 ```
 
-#### Set
+#### Output
+```
+[cisco-gnmi-python] cisco-gnmi get redacted:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:notification {
+  timestamp: 1585607100869287743
+  update {
+    path {
+      elem {
+        name: "interfaces"
+      }
+      elem {
+        name: "interface"
+      }
+      elem {
+        name: "state"
+      }
+      elem {
+        name: "counters"
+      }
+    }
+    val {
+      json_ietf_val: "{\"in-unicast-pkts\":\"0\",\"in-octets\":\"0\"...
+```
+
+### Set
 This command has not been validated. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
+
+#### Usage
 ```
 usage: cisco-gnmi [-h] [-update_json_config UPDATE_JSON_CONFIG]
               [-replace_json_config REPLACE_JSON_CONFIG]
@@ -347,12 +422,13 @@ optional arguments:
   -debug                Print debug messages.
 ```
 
-#### Subscribe
+### Subscribe
 This command will output the `SubscribeResponse` to `stdout` or `-dump_file`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`. Subscribe currently only supports a sampled stream. `ON_CHANGE` is possible but not implemented in the CLI, yet. :)
 ```
 cisco-gnmi subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
 ```
 
+#### Usage
 ```
 cisco-gnmi subscribe --help
 usage: cisco-gnmi [-h] [-xpath XPATH] [-interval INTERVAL] [-dump_file DUMP_FILE]
@@ -395,6 +471,49 @@ optional arguments:
                         Use root_certificates first CN as
                         grpc.ssl_target_name_override.
   -debug                Print debug messages.
+```
+
+#### Output
+```
+[cisco-gnmi-python] cisco-gnmi subscribe redacted:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:Dumping responses to stdout as textual proto ...
+INFO:root:Subscribing to:
+/interfaces/interface/state/counters
+INFO:root:update {
+  timestamp: 1585607768601000000
+  prefix {
+    origin: "openconfig"
+    elem {
+      name: "interfaces"
+    }
+    elem {
+      name: "interface"
+      key {
+        key: "name"
+        value: "Null0"
+      }
+    }
+    elem {
+      name: "state"
+    }
+    elem {
+      name: "counters"
+    }
+  }
+  update {
+    path {
+      elem {
+        name: "in-octets"
+      }
+    }
+    val {
+      uint_val: 0
+    }
+  }
+...
 ```
 
 ## Licensing
