@@ -166,7 +166,6 @@ def gnmi_subscribe():
 
 def gnmi_get():
     """Provides Get RPC usage. Assumes JSON or JSON_IETF style configurations.
-    TODO: This is the least well understood/implemented. Need to validate if there is an OOO for update/replace/delete.
     """
     parser = argparse.ArgumentParser(
         description="Performs Get RPC against network element."
