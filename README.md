@@ -4,15 +4,50 @@
 
 This library wraps gNMI functionality to ease usage with Cisco implementations in Python programs. Derived from [openconfig/gnmi](https://github.com/openconfig/gnmi/tree/master/proto).
 
+- [cisco-gnmi-python](#cisco-gnmi-python)
+  - [Usage](#usage)
+    - [cisco-gnmi CLI](#cisco-gnmi-cli)
+    - [ClientBuilder](#clientbuilder)
+      - [Initialization Examples](#initialization-examples)
+    - [Client](#client)
+    - [NXClient](#nxclient)
+    - [XEClient](#xeclient)
+    - [XRClient](#xrclient)
+  - [gNMI](#gnmi)
+  - [Development](#development)
+    - [Get Source](#get-source)
+    - [Code Hygiene](#code-hygiene)
+    - [Recompile Protobufs](#recompile-protobufs)
+  - [CLI Usage](#cli-usage)
+    - [Capabilities](#capabilities)
+      - [Usage](#usage-1)
+      - [Output](#output)
+    - [Get](#get)
+      - [Usage](#usage-2)
+      - [Output](#output-1)
+    - [Set](#set)
+      - [Usage](#usage-3)
+      - [Output](#output-2)
+    - [Subscribe](#subscribe)
+      - [Usage](#usage-4)
+      - [Output](#output-3)
+  - [Licensing](#licensing)
+  - [Issues](#issues)
+  - [Related Projects](#related-projects)
+
 ## Usage
 ```bash
 pip install cisco-gnmi
 python -c "import cisco_gnmi; print(cisco_gnmi)"
+cisco-gnmi --help
 ```
 
-This library covers the gNMI defined `capabilities`, `get`, `set`, and `subscribe` RPCs, and helper clients provide OS-specific recommendations. As commonalities and differences are identified this library will be refactored as necessary.
+This library covers the gNMI defined `Capabilities`, `Get`, `Set`, and `Subscribe` RPCs, and helper clients provide OS-specific recommendations. A CLI (`cisco-gnmi`) is also available upon installation. As commonalities and differences are identified between OS functionality this library will be refactored as necessary.
 
 It is *highly* recommended that users of the library learn [Google Protocol Buffers](https://developers.google.com/protocol-buffers/) syntax to significantly ease usage. Understanding how to read Protocol Buffers, and reference [`gnmi.proto`](https://github.com/openconfig/gnmi/blob/master/proto/gnmi/gnmi.proto), will be immensely useful for utilizing gNMI and any other gRPC interface.
+
+### cisco-gnmi CLI
+Since `v1.0.5` a gNMI CLI is available as `cisco-gnmi` when this module is installed. `Capabilities`, `Get`, rudimentary `Set`, and `Subscribe` are supported. The CLI may be useful for simply interacting with a Cisco gNMI service, and also serves as a reference for how to use this `cisco_gnmi` library. CLI usage is documented at the bottom of this README in [CLI Usage](#cli-usage).
 
 ### ClientBuilder
 Since `v1.0.0` a builder pattern is available with `ClientBuilder`. `ClientBuilder` provides several `set_*` methods which define the intended `Client` connectivity and a `construct` method to construct and return the desired `Client`. There are several major methods involved here:
@@ -179,6 +214,352 @@ If a new `gnmi.proto` definition is released, use `update_protos.sh` to recompil
 
 ```bash
 ./update_protos.sh
+```
+
+## CLI Usage
+The below details the current `cisco-gnmi` usage options. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
+
+```
+cisco-gnmi --help
+usage:
+cisco-gnmi <rpc> [<args>]
+
+Supported RPCs:
+capabilities
+subscribe
+get
+set
+
+cisco-gnmi capabilities 127.0.0.1:57500
+cisco-gnmi get 127.0.0.1:57500
+cisco-gnmi set 127.0.0.1:57500 -delete_xpath Cisco-IOS-XR-shellutil-cfg:host-names/host-name
+cisco-gnmi subscribe 127.0.0.1:57500 -debug -auto_ssl_target_override -dump_file intfcounters.proto.txt
+
+See <rpc> --help for RPC options.
+
+
+gNMI CLI demonstrating library usage.
+
+positional arguments:
+  rpc         gNMI RPC to perform against network element.
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+### Capabilities
+This command will output the `CapabilitiesResponse` to `stdout`.
+```
+cisco-gnmi capabilities 127.0.0.1:57500 -auto_ssl_target_override
+```
+
+#### Usage
+```
+cisco-gnmi capabilities --help
+usage: cisco-gnmi [-h] [-os {None,IOS XR,NX-OS,IOS XE}]
+              [-root_certificates ROOT_CERTIFICATES]
+              [-private_key PRIVATE_KEY]
+              [-certificate_chain CERTIFICATE_CHAIN]
+              [-ssl_target_override SSL_TARGET_OVERRIDE]
+              [-auto_ssl_target_override] [-debug]
+              netloc
+
+Performs Capabilities RPC against network element.
+
+positional arguments:
+  netloc                <host>:<port>
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -os {None,IOS XR,NX-OS,IOS XE}
+                        OS wrapper to utilize. Defaults to IOS XR.
+  -root_certificates ROOT_CERTIFICATES
+                        Root certificates for secure connection.
+  -private_key PRIVATE_KEY
+                        Private key for secure connection.
+  -certificate_chain CERTIFICATE_CHAIN
+                        Certificate chain for secure connection.
+  -ssl_target_override SSL_TARGET_OVERRIDE
+                        gRPC SSL target override option.
+  -auto_ssl_target_override
+                        Use root_certificates first CN as
+                        grpc.ssl_target_name_override.
+  -debug                Print debug messages.
+```
+
+#### Output
+```
+[cisco-gnmi-python] cisco-gnmi capabilities redacted:57500 -auto_ssl_target_override
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:supported_models {
+  name: "Cisco-IOS-XR-qos-ma-oper"
+  organization: "Cisco Systems, Inc."
+  version: "2019-04-05"
+}
+...
+```
+
+### Get
+This command will output the `GetResponse` to `stdout`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`.
+```
+cisco-gnmi get 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+```
+
+#### Usage
+```
+usage: cisco-gnmi [-h] [-xpath XPATH]
+              [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
+              [-data_type [{ALL,CONFIG,STATE,OPERATIONAL}]] [-dump_json]
+              [-os {None,IOS XR,NX-OS,IOS XE}]
+              [-root_certificates ROOT_CERTIFICATES]
+              [-private_key PRIVATE_KEY]
+              [-certificate_chain CERTIFICATE_CHAIN]
+              [-ssl_target_override SSL_TARGET_OVERRIDE]
+              [-auto_ssl_target_override] [-debug]
+              netloc
+
+Performs Get RPC against network element.
+
+positional arguments:
+  netloc                <host>:<port>
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -xpath XPATH          XPaths to Get.
+  -encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]
+                        gNMI Encoding.
+  -data_type [{ALL,CONFIG,STATE,OPERATIONAL}]
+                        gNMI GetRequest DataType
+  -dump_json            Dump as JSON instead of textual protos.
+  -os {None,IOS XR,NX-OS,IOS XE}
+                        OS wrapper to utilize. Defaults to IOS XR.
+  -root_certificates ROOT_CERTIFICATES
+                        Root certificates for secure connection.
+  -private_key PRIVATE_KEY
+                        Private key for secure connection.
+  -certificate_chain CERTIFICATE_CHAIN
+                        Certificate chain for secure connection.
+  -ssl_target_override SSL_TARGET_OVERRIDE
+                        gRPC SSL target override option.
+  -auto_ssl_target_override
+                        Use root_certificates first CN as
+                        grpc.ssl_target_name_override.
+  -debug                Print debug messages.
+```
+
+#### Output
+```
+[cisco-gnmi-python] cisco-gnmi get redacted:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:notification {
+  timestamp: 1585607100869287743
+  update {
+    path {
+      elem {
+        name: "interfaces"
+      }
+      elem {
+        name: "interface"
+      }
+      elem {
+        name: "state"
+      }
+      elem {
+        name: "counters"
+      }
+    }
+    val {
+      json_ietf_val: "{\"in-unicast-pkts\":\"0\",\"in-octets\":\"0\"...
+```
+
+### Set
+Please note that `Set` operations may be destructive to operations and should be tested in lab conditions. Behavior is not fully validated.
+
+#### Usage
+```
+usage: cisco-gnmi [-h] [-update_json_config UPDATE_JSON_CONFIG]
+              [-replace_json_config REPLACE_JSON_CONFIG]
+              [-delete_xpath DELETE_XPATH] [-no_ietf] [-dump_json]
+              [-os {None,IOS XR,NX-OS,IOS XE}]
+              [-root_certificates ROOT_CERTIFICATES]
+              [-private_key PRIVATE_KEY]
+              [-certificate_chain CERTIFICATE_CHAIN]
+              [-ssl_target_override SSL_TARGET_OVERRIDE]
+              [-auto_ssl_target_override] [-debug]
+              netloc
+
+Performs Set RPC against network element.
+
+positional arguments:
+  netloc                <host>:<port>
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -update_json_config UPDATE_JSON_CONFIG
+                        JSON-modeled config to apply as an update.
+  -replace_json_config REPLACE_JSON_CONFIG
+                        JSON-modeled config to apply as a replace.
+  -delete_xpath DELETE_XPATH
+                        XPaths to delete.
+  -no_ietf              JSON is not IETF conformant.
+  -dump_json            Dump as JSON instead of textual protos.
+  -os {None,IOS XR,NX-OS,IOS XE}
+                        OS wrapper to utilize. Defaults to IOS XR.
+  -root_certificates ROOT_CERTIFICATES
+                        Root certificates for secure connection.
+  -private_key PRIVATE_KEY
+                        Private key for secure connection.
+  -certificate_chain CERTIFICATE_CHAIN
+                        Certificate chain for secure connection.
+  -ssl_target_override SSL_TARGET_OVERRIDE
+                        gRPC SSL target override option.
+  -auto_ssl_target_override
+                        Use root_certificates first CN as
+                        grpc.ssl_target_name_override.
+  -debug                Print debug messages.
+```
+
+#### Output
+Let's create a harmless loopback interface based from [`openconfig-interfaces.yang`](https://github.com/openconfig/public/blob/master/release/models/interfaces/openconfig-interfaces.yang).
+
+`config.json`
+```json
+{
+    "openconfig-interfaces:interfaces": {
+        "interface": [
+            {
+                "name": "Loopback9339"
+            }
+        ]
+    }
+}
+```
+
+```
+[cisco-gnmi-python] cisco-gnmi set redacted:57500 -os "IOS XR" -auto_ssl_target_override -update_json_config config.json
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:response {
+  path {
+    origin: "openconfig-interfaces"
+    elem {
+      name: "interfaces"
+    }
+  }
+  message {
+  }
+  op: UPDATE
+}
+message {
+}
+timestamp: 1585715036783451369
+```
+
+And on IOS XR...a loopback interface!
+```
+...
+interface Loopback9339
+!
+...
+```
+
+### Subscribe
+This command will output the `SubscribeResponse` to `stdout` or `-dump_file`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`. Subscribe currently only supports a sampled stream. `ON_CHANGE` is possible but not implemented in the CLI, yet. :)
+```
+cisco-gnmi subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+```
+
+#### Usage
+```
+cisco-gnmi subscribe --help
+usage: cisco-gnmi [-h] [-xpath XPATH] [-interval INTERVAL] [-dump_file DUMP_FILE]
+              [-dump_json] [-sync_stop]
+              [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
+              [-os {None,IOS XR,NX-OS,IOS XE}]
+              [-root_certificates ROOT_CERTIFICATES]
+              [-private_key PRIVATE_KEY]
+              [-certificate_chain CERTIFICATE_CHAIN]
+              [-ssl_target_override SSL_TARGET_OVERRIDE]
+              [-auto_ssl_target_override] [-debug]
+              netloc
+
+Performs Subscribe RPC against network element.
+
+positional arguments:
+  netloc                <host>:<port>
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -xpath XPATH          XPath to subscribe to.
+  -interval INTERVAL    Sample interval in seconds for Subscription. Defaults
+                        to 10.
+  -dump_file DUMP_FILE  Filename to dump to. Defaults to stdout.
+  -dump_json            Dump as JSON instead of textual protos.
+  -sync_stop            Stop on sync_response.
+  -encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]
+                        gNMI Encoding.
+  -os {None,IOS XR,NX-OS,IOS XE}
+                        OS wrapper to utilize. Defaults to IOS XR.
+  -root_certificates ROOT_CERTIFICATES
+                        Root certificates for secure connection.
+  -private_key PRIVATE_KEY
+                        Private key for secure connection.
+  -certificate_chain CERTIFICATE_CHAIN
+                        Certificate chain for secure connection.
+  -ssl_target_override SSL_TARGET_OVERRIDE
+                        gRPC SSL target override option.
+  -auto_ssl_target_override
+                        Use root_certificates first CN as
+                        grpc.ssl_target_name_override.
+  -debug                Print debug messages.
+```
+
+#### Output
+```
+[cisco-gnmi-python] cisco-gnmi subscribe redacted:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:Dumping responses to stdout as textual proto ...
+INFO:root:Subscribing to:
+/interfaces/interface/state/counters
+INFO:root:update {
+  timestamp: 1585607768601000000
+  prefix {
+    origin: "openconfig"
+    elem {
+      name: "interfaces"
+    }
+    elem {
+      name: "interface"
+      key {
+        key: "name"
+        value: "Null0"
+      }
+    }
+    elem {
+      name: "state"
+    }
+    elem {
+      name: "counters"
+    }
+  }
+  update {
+    path {
+      elem {
+        name: "in-octets"
+      }
+    }
+    val {
+      uint_val: 0
+    }
+  }
+...
 ```
 
 ## Licensing
