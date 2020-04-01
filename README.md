@@ -27,9 +27,10 @@ This library wraps gNMI functionality to ease usage with Cisco implementations i
       - [Output](#output-1)
     - [Set](#set)
       - [Usage](#usage-3)
+      - [Output](#output-2)
     - [Subscribe](#subscribe)
       - [Usage](#usage-4)
-      - [Output](#output-2)
+      - [Output](#output-3)
   - [Licensing](#licensing)
   - [Issues](#issues)
   - [Related Projects](#related-projects)
@@ -376,7 +377,7 @@ INFO:root:notification {
 ```
 
 ### Set
-This command has not been validated. Please note that `Set` operations may be destructive to operations and should be tested in lab conditions.
+Please note that `Set` operations may be destructive to operations and should be tested in lab conditions. Behavior is not fully validated.
 
 #### Usage
 ```
@@ -420,6 +421,51 @@ optional arguments:
                         Use root_certificates first CN as
                         grpc.ssl_target_name_override.
   -debug                Print debug messages.
+```
+
+#### Output
+Let's create a harmless loopback interface based from [`openconfig-interfaces.yang`](https://github.com/openconfig/public/blob/master/release/models/interfaces/openconfig-interfaces.yang).
+
+`config.json`
+```json
+{
+    "openconfig-interfaces:interfaces": {
+        "interface": [
+            {
+                "name": "Loopback9339"
+            }
+        ]
+    }
+}
+```
+
+```
+[cisco-gnmi-python] cisco-gnmi set redacted:57500 -os "IOS XR" -auto_ssl_target_override -update_json_config config.json
+Username: admin
+Password:
+WARNING:root:Overriding SSL option from certificate could increase MITM susceptibility!
+INFO:root:response {
+  path {
+    origin: "openconfig-interfaces"
+    elem {
+      name: "interfaces"
+    }
+  }
+  message {
+  }
+  op: UPDATE
+}
+message {
+}
+timestamp: 1585715036783451369
+```
+
+And on IOS XR...a loopback interface!
+```
+...
+interface Loopback9339
+!
+...
 ```
 
 ### Subscribe

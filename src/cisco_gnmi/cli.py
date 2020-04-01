@@ -239,7 +239,7 @@ def gnmi_set():
         config = None
         with open(filename, "r") as config_fd:
             config = json.load(config_fd)
-        return config
+        return json.dumps(config)
 
     if args.update_json_config or args.replace_json_config:
         kwargs = {}
