@@ -26,6 +26,8 @@ the License.
 Because we're not using a wrapper, we are going to need to build our own protos.
 """
 
+import json
+from getpass import getpass
 from cisco_gnmi import ClientBuilder, proto
 
 """First let's build a Client. We are not going to specify an OS
@@ -38,14 +40,18 @@ So - either:
   * Pass full <RPC>Request protos to client.service.<RPC>()
 This code passes args to the client.<RPC>() methods.
 """
+target = input("Host/Port: ")
+username = input("Username: ")
+password = getpass()
 client = (
-    ClientBuilder("127.0.0.1:9339")
+    ClientBuilder(target)
     .set_secure_from_target()
     .set_ssl_target_override()
-    .set_authentication("admin", "its_a_secret")
+    .set_call_authentication(username, password)
     .construct()
 )
 """Capabilities is an easy RPC to test."""
+input("Press Enter for Capabilities...")
 capabilities = client.capabilities()
 print(capabilities)
 """Let's build a Get!
@@ -54,12 +60,14 @@ client.parse_xpath_to_gnmi_path is a convenience method to..parse an XPath to a 
 Generally OS wrappers will override this function to specialize on origins, etc.
 But we are not using a wrapper, and if using OpenConfig pathing we don't need an origin.
 """
+input("Press Enter for Get...")
 get_path = client.parse_xpath_to_gnmi_path("/interfaces/interface/state/counters")
 get_response = client.get([get_path], data_type="STATE", encoding="JSON_IETF")
 print(get_response)
 """Let's build a sampled Subscribe!
 client.subscribe() accepts an iterable of SubscriptionLists
 """
+input("Press Enter for Subscribe SAMPLE...")
 subscription_list = proto.gnmi_pb2.SubscriptionList()
 subscription_list.mode = proto.gnmi_pb2.SubscriptionList.Mode.Value("STREAM")
 subscription_list.encoding = proto.gnmi_pb2.Encoding.Value("PROTO")
@@ -70,12 +78,11 @@ sampled_subscription.path.CopyFrom(
 sampled_subscription.mode = proto.gnmi_pb2.SubscriptionMode.Value("SAMPLE")
 sampled_subscription.sample_interval = 10 * int(1e9)
 subscription_list.subscription.append(sampled_subscription)
-# Only print 2 responses
-for msg_idx, subscribe_response in enumerate(client.subscribe([subscription_list])):
+for subscribe_response in client.subscribe([subscription_list]):
     print(subscribe_response)
-    if msg_idx + 1 == 2:
-        break
+    break
 """Now let's do ON_CHANGE. Just have to put SubscriptionMode to ON_CHANGE."""
+input("Press Enter for Subscribe ON_CHANGE...")
 subscription_list = proto.gnmi_pb2.SubscriptionList()
 subscription_list.mode = proto.gnmi_pb2.SubscriptionList.Mode.Value("STREAM")
 subscription_list.encoding = proto.gnmi_pb2.Encoding.Value("PROTO")
@@ -87,23 +94,45 @@ onchange_subscription.path.CopyFrom(
 )
 onchange_subscription.mode = proto.gnmi_pb2.SubscriptionMode.Value("ON_CHANGE")
 subscription_list.subscription.append(onchange_subscription)
-# Only print 2 responses
-for msg_idx, subscribe_response in enumerate(client.subscribe([subscription_list])):
+synced = False
+for subscribe_response in client.subscribe([subscription_list]):
+    if subscribe_response.sync_response:
+        synced = True
+        print("Synced. Now perform action that will create a changed value.")
+        print("If using XR syslog as written, just try SSH'ing to device.")
+        continue
+    if not synced:
+        continue
     print(subscribe_response)
-    if msg_idx + 1 == 2:
-        break
+    break
 """Let's build a Set!
 client.set() expects updates, replaces, and/or deletes to be provided.
 updates is a list of Updates
 replaces is a list of Updates
 deletes is a list of Paths
-Let's do an update, and then a delete.
+Let's do an update.
 """
+input("Press Enter for Set update...")
 set_update = proto.gnmi_pb2.Update()
-set_json = """
+# This is the fully modeled JSON we want to update with
+update_json = json.loads("""
 {
-    "config": {
-        "login-banner": "Hello, gNMI!"
+    "openconfig-interfaces:interfaces": {
+        "interface": [
+            {
+                "name": "Loopback9339"
+            }
+        ]
     }
 }
-"""
+""")
+# Let's just do an update from the very top element
+top_element = next(iter(update_json.keys()))
+set_update.path.CopyFrom(client.parse_xpath_to_gnmi_path(top_element))
+# Remove the top element from the config since it's now in Path
+update_json = update_json.pop(top_element)
+# Set our update payload
+set_update.val.json_ietf_val = json.dumps(update_json).encode("utf-8")
+set_result = client.set(updates=[set_update])
+print(set_result)
+# This may all seem somewhat obtuse, and that's what the client wrappers are for.
