@@ -77,7 +77,7 @@ sampled_subscription.path.CopyFrom(
 )
 sampled_subscription.mode = proto.gnmi_pb2.SubscriptionMode.Value("SAMPLE")
 sampled_subscription.sample_interval = 10 * int(1e9)
-subscription_list.subscription.append(sampled_subscription)
+subscription_list.subscription.extend([sampled_subscription])
 for subscribe_response in client.subscribe([subscription_list]):
     print(subscribe_response)
     break
@@ -93,7 +93,7 @@ onchange_subscription.path.CopyFrom(
     )
 )
 onchange_subscription.mode = proto.gnmi_pb2.SubscriptionMode.Value("ON_CHANGE")
-subscription_list.subscription.append(onchange_subscription)
+subscription_list.subscription.extend([onchange_subscription])
 synced = False
 for subscribe_response in client.subscribe([subscription_list]):
     if subscribe_response.sync_response:
