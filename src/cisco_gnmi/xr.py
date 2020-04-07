@@ -279,10 +279,10 @@ class XRClient(Client):
             desired behavior.
             ON_CHANGE only streams updates when changes occur.
             SAMPLE will stream the subscription at a regular cadence/interval.
-            [TARGET_DEFINED, ON_CHANGE, SAMPLE]
+            [ON_CHANGE, SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
             A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
-            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
+            [PROTO]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
             Defaults to 10 seconds.
@@ -297,62 +297,42 @@ class XRClient(Client):
         -------
         subscribe()
         """
-        subscription_list = proto.gnmi_pb2.SubscriptionList()
-        subscription_list.mode = util.validate_proto_enum(
+        supported_request_modes = ["STREAM", "ONCE", "POLL"]
+        request_mode = util.validate_proto_enum(
             "mode",
             request_mode,
             "SubscriptionList.Mode",
             proto.gnmi_pb2.SubscriptionList.Mode,
+            subset=supported_request_modes,
+            return_name=True,
         )
-        subscription_list.encoding = util.validate_proto_enum(
-            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
+        supported_encodings = ["PROTO"]
+        encoding = util.validate_proto_enum(
+            "encoding",
+            encoding,
+            "Encoding",
+            proto.gnmi_pb2.Encoding,
+            subset=supported_encodings,
+            return_name=True,
         )
-        if isinstance(xpath_subscriptions, string_types):
-            xpath_subscriptions = [xpath_subscriptions]
-        subscriptions = []
-        for xpath_subscription in xpath_subscriptions:
-            subscription = None
-            if isinstance(xpath_subscription, string_types):
-                subscription = proto.gnmi_pb2.Subscription()
-                subscription.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(xpath_subscription)
-                )
-                subscription.mode = util.validate_proto_enum(
-                    "sub_mode",
-                    sub_mode,
-                    "SubscriptionMode",
-                    proto.gnmi_pb2.SubscriptionMode,
-                )
-                subscription.sample_interval = sample_interval
-                subscription.suppress_redundant = suppress_redundant
-                if heartbeat_interval:
-                    subscription.heartbeat_interval = heartbeat_interval
-            elif isinstance(xpath_subscription, dict):
-                path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
-                arg_dict = {
-                    "path": path,
-                    "mode": sub_mode,
-                    "sample_interval": sample_interval,
-                    "suppress_redundant": suppress_redundant,
-                }
-                if heartbeat_interval:
-                    arg_dict["heartbeat_interval"] = heartbeat_interval
-                arg_dict.update(xpath_subscription)
-                if "mode" in arg_dict:
-                    arg_dict["mode"] = util.validate_proto_enum(
-                        "sub_mode",
-                        arg_dict["mode"],
-                        "SubscriptionMode",
-                        proto.gnmi_pb2.SubscriptionMode,
-                    )
-                subscription = proto.gnmi_pb2.Subscription(**arg_dict)
-            elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
-                subscription = xpath_subscription
-            else:
-                raise Exception("xpath in list must be xpath or dict/Path!")
-            subscriptions.append(subscription)
-        subscription_list.subscription.extend(subscriptions)
-        return self.subscribe([subscription_list])
+        supported_sub_modes = ["ON_CHANGE", "SAMPLE"]
+        sub_mode = util.validate_proto_enum(
+            "sub_mode",
+            sub_mode,
+            "SubscriptionMode",
+            proto.gnmi_pb2.SubscriptionMode,
+            subset=supported_sub_modes,
+            return_name=True,
+        )
+        return super(XRClient, self).subscribe_xpaths(
+            xpath_subscriptions,
+            request_mode,
+            sub_mode,
+            encoding,
+            sample_interval,
+            suppress_redundant,
+            heartbeat_interval,
+        )
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """No origin specified implies openconfig

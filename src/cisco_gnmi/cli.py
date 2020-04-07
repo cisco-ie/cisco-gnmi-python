@@ -91,8 +91,7 @@ def gnmi_capabilities():
 
 
 def gnmi_subscribe():
-    """Performs a sampled Subscribe against network element.
-    TODO: ON_CHANGE
+    """Performs a streaming Subscribe against network element.
     """
     parser = argparse.ArgumentParser(
         description="Performs Subscribe RPC against network element."
@@ -105,6 +104,20 @@ def gnmi_subscribe():
         help="Sample interval in seconds for Subscription. Defaults to 10.",
         type=int,
         default=10,
+    )
+    parser.add_argument(
+        "-mode",
+        help="SubscriptionMode for Subscription. Defaults to SAMPLE.",
+        default="SAMPLE",
+        choices=proto.gnmi_pb2.SubscriptionMode.keys(),
+    )
+    parser.add_argument(
+        "-suppress_redundant",
+        help="Suppress redundant information in Subscription.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-heartbeat_interval", help="Heartbeat interval in seconds.", type=int
     )
     parser.add_argument(
         "-dump_file",
@@ -121,10 +134,14 @@ def gnmi_subscribe():
         "-sync_stop", help="Stop on sync_response.", action="store_true"
     )
     parser.add_argument(
+        "-sync_start",
+        help="Start processing messages after sync_response.",
+        action="store_true",
+    )
+    parser.add_argument(
         "-encoding",
-        help="gNMI Encoding.",
+        help="gNMI Encoding. Defaults to whatever Client wrapper prefers.",
         type=str,
-        nargs="?",
         choices=proto.gnmi_pb2.Encoding.keys(),
     )
     args = __common_args_handler(parser)
@@ -138,13 +155,20 @@ def gnmi_subscribe():
         kwargs["encoding"] = args.encoding
     if args.interval:
         kwargs["sample_interval"] = args.interval * int(1e9)
+    if args.mode:
+        kwargs["sub_mode"] = args.mode
+    if args.suppress_redundant:
+        kwargs["suppress_redundant"] = args.suppress_redundant
+    if args.heartbeat_interval:
+        kwargs["heartbeat_interval"] = args.heartbeat_interval * int(1e9)
     try:
-        logging.info(
+        logging.debug(
             "Dumping responses to %s as %s ...",
             args.dump_file,
             "JSON" if args.dump_json else "textual proto",
         )
-        logging.info("Subscribing to:\n%s", "\n".join(args.xpath))
+        logging.debug("Subscribing to:\n%s", "\n".join(args.xpath))
+        synced = False
         for subscribe_response in client.subscribe_xpaths(args.xpath, **kwargs):
             logging.debug("SubscribeResponse received.")
             if subscribe_response.sync_response:
@@ -152,6 +176,9 @@ def gnmi_subscribe():
                 if args.sync_stop:
                     logging.warning("Stopping on sync_response.")
                     break
+                synced = True
+            if not synced and args.sync_start:
+                continue
             formatted_message = __format_message(subscribe_response)
             if args.dump_file == "stdout":
                 logging.info(formatted_message)
@@ -175,14 +202,12 @@ def gnmi_get():
         "-encoding",
         help="gNMI Encoding.",
         type=str,
-        nargs="?",
         choices=proto.gnmi_pb2.Encoding.keys(),
     )
     parser.add_argument(
         "-data_type",
         help="gNMI GetRequest DataType",
         type=str,
-        nargs="?",
         choices=enum_type_wrapper.EnumTypeWrapper(
             proto.gnmi_pb2._GETREQUEST_DATATYPE
         ).keys(),
