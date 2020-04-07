@@ -157,7 +157,9 @@ class NXClient(Client):
                 "OpenConfig data models not yet supported on NX-OS!"
             )
         if origin is None:
-            if any(map(xpath.startswith, ["Cisco-NX-OS-device", "ietf-interfaces"])):
+            if any(
+                map(xpath.startswith, ["Cisco-NX-OS-device", "/Cisco-NX-OS-device"])
+            ):
                 origin = "device"
                 # Remove the module
                 xpath = xpath.split(":", 1)[1]

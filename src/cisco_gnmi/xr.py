@@ -346,6 +346,7 @@ class XRClient(Client):
             else:
                 # module name
                 origin, xpath = xpath.split(":", 1)
+                origin = origin.strip("/")
         return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
 
     def parse_cli_to_gnmi_path(self, command):
