@@ -31,8 +31,8 @@ import json
 import os
 from six import string_types
 
-from . import proto
-from . import util
+from cisco_gnmi import proto
+from cisco_gnmi import util
 
 
 class Client(object):
@@ -256,6 +256,84 @@ class Client(object):
             (validate_request(request) for request in request_iter)
         )
         return response_stream
+
+    def check_configs(self, configs):
+        if isinstance(configs, string_types):
+            logger.debug("Handling as JSON string.")
+            try:
+                configs = json.loads(configs)
+            except:
+                raise Exception("{0}\n is invalid JSON!".format(configs))
+            configs = [configs]
+        elif isinstance(configs, dict):
+            logger.debug("Handling already serialized JSON object.")
+            configs = [configs]
+        elif not isinstance(configs, (list, set)):
+            raise Exception(
+                "{0} must be an iterable of configs!".format(str(configs))
+            )
+        return configs
+
+    def create_updates(self, configs, origin, json_ietf=False):
+        """Check configs, and construct "Update" messages.
+
+        Parameters
+        ----------
+        configs: dict of <xpath>: <dict val for JSON>
+        origin: str [DME, device, openconfig]
+        json_ietf: bool encoding type for Update val (default False)
+
+        Returns
+        -------
+        List of Update messages with val populated.
+
+        If a set of configs contain a common Xpath, the Update must contain
+        a consolidation of xpath/values for 2 reasons:
+
+        1. Devices may have a restriction on how many Update messages it will
+           accept at once.
+        2. Some xpath/values are required to be set in same Update because of
+           dependencies like leafrefs, mandatory settings, and if/when/musts.
+        """
+        if not configs:
+            return []
+        configs = self.check_configs(configs)
+
+        xpaths = []
+        updates = []
+        for config in configs:
+            xpath = next(iter(config.keys()))
+            xpaths.append(xpath)
+        common_xpath = os.path.commonprefix(xpaths)
+
+        if common_xpath:
+            update_configs = self.get_payload(configs)
+            for update_cfg in update_configs:
+                xpath, payload = update_cfg
+                update = proto.gnmi_pb2.Update()
+                update.path.CopyFrom(
+                    self.parse_xpath_to_gnmi_path(
+                        xpath, origin=origin
+                    )
+                )
+                if json_ietf:
+                    update.val.json_ietf_val = payload
+                else:
+                    update.val.json_val = payload
+                updates.append(update)
+            return updates
+        else:
+            for config in configs:
+                top_element = next(iter(config.keys()))
+                update = proto.gnmi_pb2.Update()
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
+                config = config.pop(top_element)
+                if json_ietf:
+                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
+                else:
+                    update.val.json_val = json.dumps(config).encode("utf-8")
+                updates.append(update)
+            return updates
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """Parses an XPath to proto.gnmi_pb2.Path.
@@ -540,3 +618,230 @@ class Client(object):
                 )
             )
         return updates
+
+    def xml_path_to_path_elem(self, request):
+        """Convert XML Path Language 1.0 Xpath to gNMI Path/PathElement.
+
+        Modeled after YANG/NETCONF Xpaths.
+
+        References:
+        * https://www.w3.org/TR/1999/REC-xpath-19991116/#location-paths
+        * https://www.w3.org/TR/1999/REC-xpath-19991116/#path-abbrev
+        * https://tools.ietf.org/html/rfc6020#section-6.4
+        * https://tools.ietf.org/html/rfc6020#section-9.13
+        * https://tools.ietf.org/html/rfc6241
+
+        Parameters
+        ---------
+        request: dict containing request namespace and nodes to be worked on.
+            namespace: dict of <prefix>: <namespace>
+            nodes: list of dict
+                  <xpath>: Xpath pointing to resource
+                  <value>: value to set resource to
+                  <edit-op>: equivelant NETCONF edit-config operation
+
+        Returns
+        -------
+        tuple: namespace_modules, message dict, origin
+            namespace_modules: dict of <prefix>: <module name>
+                Needed for future support.
+            message dict: 4 lists containing possible updates, replaces,
+                deletes, or gets derived form input nodes.
+            origin str: DME, device, or openconfig
+        """
+
+        paths = []
+        message = {
+            'update': [],
+            'replace': [],
+            'delete': [],
+            'get': [],
+        }
+        if 'nodes' not in request:
+            # TODO: raw rpc?
+            return paths
+        else:
+            namespace_modules = {}
+            origin = 'DME'
+            for prefix, nspace in request.get('namespace', {}).items():
+                if '/Cisco-IOS-' in nspace:
+                    module = nspace[nspace.rfind('/') + 1:]
+                elif '/cisco-nx' in nspace: # NXOS lowercases namespace
+                    module = 'Cisco-NX-OS-device'
+                elif '/openconfig.net' in nspace:
+                    module = 'openconfig-'
+                    module += nspace[nspace.rfind('/') + 1:]
+                elif 'urn:ietf:params:xml:ns:yang:' in nspace:
+                    module = nspace.replace(
+                        'urn:ietf:params:xml:ns:yang:', '')
+                if module:
+                    namespace_modules[prefix] = module
+
+            for node in request.get('nodes', []):
+                if 'xpath' not in node:
+                    log.error('Xpath is not in message')
+                else:
+                    xpath = node['xpath']
+                    value = node.get('value', '')
+                    edit_op = node.get('edit-op', '')
+
+                    for pfx, ns in namespace_modules.items():
+                        # NXOS does not support prefixes yet so clear them out
+                        if pfx in xpath and 'openconfig' in ns:
+                            origin = 'openconfig'
+                            xpath = xpath.replace(pfx + ':', '')
+                            if isinstance(value, string_types):
+                                value = value.replace(pfx + ':', '')
+                        elif pfx in xpath and 'device' in ns:
+                            origin = 'device'
+                            xpath = xpath.replace(pfx + ':', '')
+                            if isinstance(value, string_types):
+                                value = value.replace(pfx + ':', '')
+                    if edit_op:
+                        if edit_op in ['create', 'merge', 'replace']:
+                            xpath_lst = xpath.split('/')
+                            name = xpath_lst.pop()
+                            xpath = '/'.join(xpath_lst)
+                            if edit_op == 'replace':
+                                if not message['replace']:
+                                    message['replace'] = [{
+                                        xpath: {name: value}
+                                    }]
+                                else:
+                                    message['replace'].append(
+                                        {xpath: {name: value}}
+                                    )
+                            else:
+                                if not message['update']:
+                                    message['update'] = [{
+                                        xpath: {name: value}
+                                    }]
+                                else:
+                                    message['update'].append(
+                                        {xpath: {name: value}}
+                                    )
+                        elif edit_op in ['delete', 'remove']:
+                            if message['delete']:
+                                message['delete'].add(xpath)
+                            else:
+                                message['delete'] = set(xpath)
+                    else:
+                        message['get'].append(xpath)
+        return namespace_modules, message, origin
+
+
+if __name__ == '__main__':
+    from pprint import pprint as pp
+    import grpc
+    from cisco_gnmi import Client
+    from cisco_gnmi.auth import CiscoAuthPlugin
+    channel = grpc.secure_channel(
+        '127.0.0.1:9339',
+        grpc.composite_channel_credentials(
+            grpc.ssl_channel_credentials(),
+            grpc.metadata_call_credentials(
+                CiscoAuthPlugin(
+                        'admin',
+                        'its_a_secret'
+                )
+            )
+        )
+    )
+    client = Client(channel)
+    request = {
+        'namespace': {
+            'oc-acl': 'http://openconfig.net/yang/acl'
+        },
+        'nodes': [
+            {
+                'value': 'testacl',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set/name',
+                'edit-op': 'merge'
+            },
+            {
+                'value': 'ACL_IPV4',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set/type',
+                'edit-op': 'merge'
+            },
+            {
+                'value': '10',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry/oc-acl:sequence-id',
+                'edit-op': 'merge'
+            },
+            {
+                'value': '20.20.20.1/32',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:destination-address',
+                'edit-op': 'merge'
+            },
+            {
+                'value': 'IP_TCP',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:protocol',
+                'edit-op': 'merge'
+            },
+            {
+                'value': '10.10.10.10/32',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:source-address',
+                'edit-op': 'merge'
+            },
+            {
+                'value': 'DROP',
+                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:actions/oc-acl:config/oc-acl:forwarding-action',
+                'edit-op': 'merge'
+            }
+        ]
+    }
+    modules, message, origin = client.xpath_to_path_elem(request)
+    pp(modules)
+    pp(message)
+    pp(origin)
+    """
+    # Expected output
+    =================
+    {'oc-acl': 'openconfig-acl'}
+    {'delete': [],
+    'get': [],
+    'replace': [],
+    'update': [{'/acl/acl-sets/acl-set': {'name': 'testacl'}},
+                {'/acl/acl-sets/acl-set': {'type': 'ACL_IPV4'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry': {'sequence-id': '10'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'destination-address': '20.20.20.1/32'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'protocol': 'IP_TCP'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'source-address': '10.10.10.10/32'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/actions/config': {'forwarding-action': 'DROP'}}]}
+    'openconfig'
+    """
+    # Feed converted XML Path Language 1.0 Xpaths to create updates
+    updates = client.create_updates(message['update'], origin)
+    pp(updates)
+    """
+    # Expected output
+    =================
+    [path {
+    origin: "openconfig"
+    elem {
+        name: "acl"
+    }
+    elem {
+        name: "acl-sets"
+    }
+    elem {
+        name: "acl-set"
+        key {
+        key: "name"
+        value: "testacl"
+        }
+        key {
+        key: "type"
+        value: "ACL_IPV4"
+        }
+    }
+    elem {
+        name: "acl-entries"
+    }
+    }
+    val {
+    json_val: "{\"acl-entry\": [{\"actions\": {\"config\": {\"forwarding-action\": \"DROP\"}}, \"ipv4\": {\"config\": {\"destination-address\": \"20.20.20.1/32\", \"protocol\": \"IP_TCP\", \"source-address\": \"10.10.10.10/32\"}}, \"sequence-id\": \"10\"}]}"
+    }
+    ]
+    # update is now ready to be sent through gNMI SetRequest
+    """
