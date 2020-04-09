@@ -110,7 +110,6 @@ def get_cn_from_cert(cert_pem):
     Defaults to first found if multiple CNs identified.
     """
     cert_cn = None
-    import pdb; pdb.set_trace()
     cert_parsed = x509.load_pem_x509_certificate(cert_pem, default_backend())
     cert_cns = cert_parsed.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
     if len(cert_cns) > 0:

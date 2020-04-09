@@ -56,108 +56,6 @@ class NXClient(Client):
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     """
-
-    def xpath_to_path_elem(self, request):
-        """Helper function for Nexus clients.
-
-        Parameters
-        ---------
-        request: dict containing request namespace and nodes to be worked on.
-            namespace: dict of <prefix>: <namespace>
-            nodes: list of dict
-                  <xpath>: Xpath pointing to resource
-                  <value>: value to set resource to
-                  <edit-op>: equivelant NETCONF edit-config operation
-
-        Returns
-        -------
-        tuple: namespace_modules, message dict, origin
-            namespace_modules: dict of <prefix>: <module name>
-                Needed for future support.
-            message dict: 4 lists containing possible updates, replaces,
-                deletes, or gets derived form input nodes.
-            origin str: DME, device, or openconfig
-        """
-
-        paths = []
-        message = {
-            'update': [],
-            'replace': [],
-            'delete': [],
-            'get': [],
-        }
-        if 'nodes' not in request:
-            # TODO: raw rpc?
-            return paths
-        else:
-            namespace_modules = {}
-            origin = 'DME'
-            for prefix, nspace in request.get('namespace', {}).items():
-                if '/Cisco-IOS-' in nspace:
-                    module = nspace[nspace.rfind('/') + 1:]
-                elif '/cisco-nx' in nspace: # NXOS lowercases namespace
-                    module = 'Cisco-NX-OS-device'
-                elif '/openconfig.net' in nspace:
-                    module = 'openconfig-'
-                    module += nspace[nspace.rfind('/') + 1:]
-                elif 'urn:ietf:params:xml:ns:yang:' in nspace:
-                    module = nspace.replace(
-                        'urn:ietf:params:xml:ns:yang:', '')
-                if module:
-                    namespace_modules[prefix] = module
-
-            for node in request.get('nodes', []):
-                if 'xpath' not in node:
-                    log.error('Xpath is not in message')
-                else:
-                    xpath = node['xpath']
-                    value = node.get('value', '')
-                    edit_op = node.get('edit-op', '')
-
-                    for pfx, ns in namespace_modules.items():
-                        # NXOS does not support prefixes yet so clear them out
-                        if pfx in xpath and 'openconfig' in ns:
-                            origin = 'openconfig'
-                            xpath = xpath.replace(pfx + ':', '')
-                            if isinstance(value, string_types):
-                                value = value.replace(pfx + ':', '')
-                        elif pfx in xpath and 'device' in ns:
-                            origin = 'device'
-                            xpath = xpath.replace(pfx + ':', '')
-                            if isinstance(value, string_types):
-                                value = value.replace(pfx + ':', '')
-                    if edit_op:
-                        if edit_op in ['create', 'merge', 'replace']:
-                            xpath_lst = xpath.split('/')
-                            name = xpath_lst.pop()
-                            xpath = '/'.join(xpath_lst)
-                            if edit_op == 'replace':
-                                if not message['replace']:
-                                    message['replace'] = [{
-                                        xpath: {name: value}
-                                    }]
-                                else:
-                                    message['replace'].append(
-                                        {xpath: {name: value}}
-                                    )
-                            else:
-                                if not message['update']:
-                                    message['update'] = [{
-                                        xpath: {name: value}
-                                    }]
-                                else:
-                                    message['update'].append(
-                                        {xpath: {name: value}}
-                                    )
-                        elif edit_op in ['delete', 'remove']:
-                            if message['delete']:
-                                message['delete'].add(xpath)
-                            else:
-                                message['delete'] = set(xpath)
-                    else:
-                        message['get'].append(xpath)
-        return namespace_modules, message, origin
-
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
         to be passed to set() as the delete parameter.
@@ -189,84 +87,6 @@ class NXClient(Client):
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
             paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
-
-    def check_configs(self, configs):
-        if isinstance(configs, string_types):
-            logger.debug("Handling as JSON string.")
-            try:
-                configs = json.loads(configs)
-            except:
-                raise Exception("{0}\n is invalid JSON!".format(configs))
-            configs = [configs]
-        elif isinstance(configs, dict):
-            logger.debug("Handling already serialized JSON object.")
-            configs = [configs]
-        elif not isinstance(configs, (list, set)):
-            raise Exception(
-                "{0} must be an iterable of configs!".format(str(configs))
-            )
-        return configs
-
-    def create_updates(self, configs, origin, json_ietf=False):
-        """Check configs, and construct "Update" messages.
-
-        Parameters
-        ----------
-        configs: dict of <xpath>: <dict val for JSON>
-        origin: str [DME, device, openconfig]
-        json_ietf: bool encoding type for Update val (default False)
-
-        Returns
-        -------
-        List of Update messages with val populated.
-
-        If a set of configs contain a common Xpath, the Update must contain
-        a consolidation of xpath/values for 2 reasons:
-
-        1. Devices may have a restriction on how many Update messages it will
-           accept at once.
-        2. Some xpath/values are required to be set in same Update because of
-           dependencies like leafrefs, mandatory settings, and if/when/musts.
-        """
-        if not configs:
-            return []
-        configs = self.check_configs(configs)
-
-        xpaths = []
-        updates = []
-        for config in configs:
-            xpath = next(iter(config.keys()))
-            xpaths.append(xpath)
-        common_xpath = os.path.commonprefix(xpaths)
-
-        if common_xpath:
-            update_configs = self.get_payload(configs)
-            for update_cfg in update_configs:
-                xpath, payload = update_cfg
-                update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(
-                        xpath, origin=origin
-                    )
-                )
-                if json_ietf:
-                    update.val.json_ietf_val = payload
-                else:
-                    update.val.json_val = payload
-                updates.append(update)
-            return updates
-        else:
-            for config in configs:
-                top_element = next(iter(config.keys()))
-                update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
-                config = config.pop(top_element)
-                if json_ietf:
-                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
-                else:
-                    update.val.json_val = json.dumps(config).encode("utf-8")
-                updates.append(update)
-            return updates
 
     def set_json(self, update_json_configs=None, replace_json_configs=None,
                  origin='device', json_ietf=False):
@@ -302,7 +122,7 @@ class NXClient(Client):
             json_ietf=json_ietf
         )
         for update in updates + replaces:
-            logger.info('\nGNMI set:\n{0}\n{1}'.format(9 * '=', str(update)))
+            logger.debug('\nGNMI set:\n{0}\n{1}'.format(9 * '=', str(update)))
 
         return self.set(updates=updates, replaces=replaces)
 
@@ -345,7 +165,7 @@ class NXClient(Client):
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
-        logger.info('GNMI get:\n{0}\n{1}'.format(9 * '=', str(gnmi_path)))
+        logger.debug('GNMI get:\n{0}\n{1}'.format(9 * '=', str(gnmi_path)))
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def subscribe_xpaths(
@@ -458,7 +278,7 @@ class NXClient(Client):
                 raise Exception("xpath in list must be xpath or dict/Path!")
             subscriptions.append(subscription)
         subscription_list.subscription.extend(subscriptions)
-        logger.info('GNMI subscribe:\n{0}\n{1}'.format(
+        logger.debug('GNMI subscribe:\n{0}\n{1}'.format(
             15 * '=', str(subscription_list))
         )
         return self.subscribe([subscription_list])
@@ -474,3 +294,34 @@ class NXClient(Client):
                 origin = "DME"
 
         return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+
+    def xpath_to_path_elem(self, request):
+        """Convert XML Path Language 1.0 formed xpath to gNMI PathElement.
+
+        Modeled after NETCONF Xpaths RFC 6020 (See client.py for use example).
+
+        References:
+        * https://www.w3.org/TR/1999/REC-xpath-19991116/#location-paths
+        * https://www.w3.org/TR/1999/REC-xpath-19991116/#path-abbrev
+        * https://tools.ietf.org/html/rfc6020#section-6.4
+        * https://tools.ietf.org/html/rfc6020#section-9.13
+
+        Parameters
+        ---------
+        request: dict containing request namespace and nodes to be worked on.
+            namespace: dict of <prefix>: <namespace>
+            nodes: list of dict
+                  <xpath>: Xpath pointing to resource
+                  <value>: value to set resource to
+                  <edit-op>: equivelant NETCONF edit-config operation
+
+        Returns
+        -------
+        tuple: namespace_modules, message dict, origin
+            namespace_modules: dict of <prefix>: <module name>
+                Needed for future support.
+            message dict: 4 lists containing possible updates, replaces,
+                deletes, or gets derived form input nodes.
+            origin str: DME, device, or openconfig
+        """
+        return super(NXClient, self).xml_path_to_path_elem(request)
