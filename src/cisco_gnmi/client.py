@@ -156,9 +156,7 @@ class Client(object):
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         request = proto.gnmi_pb2.GetRequest()
-        try:
-            iter(paths)
-        except TypeError:
+        if not isinstance(paths, (list, set, map)):
             raise Exception("paths must be an iterable containing Path(s)!")
         request.path.extend(paths)
         request.type = data_type
