@@ -419,13 +419,15 @@ class Client(object):
         path.elem.extend(path_elems)
         return path
 
-    def combine_configs(self, payload, last_xpath, xpath, config):
+    def combine_configs(self, payload, last_xpath, cfg):
         """Walking from end to finish 2 xpaths merge so combine them
-
-            |---last xpath config
-        ----|
-            |---this xpath config
-
+                                   |--config
+            |---last xpath config--|
+        ----|                      |--config
+            |
+            |   pick these up -->  |--config
+            |---this xpath config--|
+                                   |--config
         Parameters
         ----------
         payload: dict of partial payload
@@ -433,29 +435,19 @@ class Client(object):
         xpath: colliding xpath
         config: dict of values associated to colliding xpath
         """
-        last_set = set(last_xpath.split('/'))
-        curr_diff = set(xpath.split('/')) - last_set
-        if len(curr_diff) > 1:
-            print('combine_configs() error1')
-            return payload
-        index = curr_diff.pop()
-        curr_xpath = xpath[xpath.find(index):]
-        curr_xpath = curr_xpath.split('/')
-        curr_xpath.reverse()
-        for seg in curr_xpath:
-            config = {seg: config}
-
-        last_diff = last_set - set(xpath.split('/'))
-        if len(last_diff) > 1:
-            print('combine_configs() error2')
-            return payload
-        last_xpath = last_xpath[last_xpath.find(last_diff.pop()):]
-        last_xpath = last_xpath.split('/')
-        last_xpath.reverse()
-        for seg in last_xpath:
-            if seg not in payload:
-                payload = {seg: payload}
-        payload.update(config)
+        xpath, config, is_key = cfg
+        lp = last_xpath.split('/')
+        xp = xpath.split('/')
+        base = []
+        top = ''
+        for i, seg in enumerate(zip(lp, xp)):
+            if seg[0] != seg[1]:
+                top = seg[1]
+                break
+        base = '/' + '/'.join(xp[i:])
+        cfg = (base, config, False)
+        extended_payload = {top: self.xpath_to_json([cfg])}
+        payload.update(extended_payload)
         return payload
 
     def xpath_to_json(self, configs, last_xpath='', payload={}):
@@ -474,11 +466,11 @@ class Client(object):
         for i, cfg in enumerate(configs, 1):
             xpath, config, is_key = cfg
             if last_xpath and xpath not in last_xpath:
-                # Branched config here
-                #   |---last xpath config
-                # --|
+                # Branched config here     |---config
+                #   |---last xpath config--|
+                # --|                      |---config
                 #   |---this xpath config
-                payload = self.combine_configs(payload, last_xpath, xpath, config)
+                payload = self.combine_configs(payload, last_xpath, cfg)
                 return self.xpath_to_json(configs[i:], xpath, payload)
             xpath_segs = xpath.split('/')
             xpath_segs.reverse()
@@ -733,7 +725,6 @@ class Client(object):
 if __name__ == '__main__':
     from pprint import pprint as pp
     import grpc
-    from cisco_gnmi import Client
     from cisco_gnmi.auth import CiscoAuthPlugin
     channel = grpc.secure_channel(
         '127.0.0.1:9339',
@@ -790,7 +781,7 @@ if __name__ == '__main__':
             }
         ]
     }
-    modules, message, origin = client.xpath_to_path_elem(request)
+    modules, message, origin = client.xml_path_to_path_elem(request)
     pp(modules)
     pp(message)
     pp(origin)
