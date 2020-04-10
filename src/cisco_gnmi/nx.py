@@ -29,7 +29,9 @@ import json
 import os
 
 from six import string_types
-from .client import Client, proto, util
+from cisco_gnmi import proto, util
+from cisco_gnmi.client import Client
+from cisco_gnmi.xpath_util import parse_xpath_to_gnmi_path
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +87,7 @@ class NXClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            paths.append(self.parse_xpath_to_gnmi_path(xpath))
+            paths.append(parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
     def set_json(self, update_json_configs=None, replace_json_configs=None,
@@ -158,9 +160,9 @@ class NXClient(Client):
         if isinstance(xpaths, (list, set)):
             gnmi_path = []
             for xpath in set(xpaths):
-                gnmi_path.append(self.parse_xpath_to_gnmi_path(xpath, origin))
+                gnmi_path.append(parse_xpath_to_gnmi_path(xpath, origin))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths, origin)]
+            gnmi_path = [parse_xpath_to_gnmi_path(xpaths, origin)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
@@ -239,7 +241,7 @@ class NXClient(Client):
             if isinstance(xpath_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(
+                    parse_xpath_to_gnmi_path(
                         xpath_subscription,
                         origin
                     )
@@ -253,7 +255,7 @@ class NXClient(Client):
                 )
                 subscription.sample_interval = sample_interval
             elif isinstance(xpath_subscription, dict):
-                path = self.parse_xpath_to_gnmi_path(
+                path = parse_xpath_to_gnmi_path(
                     xpath_subscription["path"],
                     origin
                 )
@@ -282,46 +284,3 @@ class NXClient(Client):
             15 * '=', str(subscription_list))
         )
         return self.subscribe([subscription_list])
-
-    def parse_xpath_to_gnmi_path(self, xpath, origin):
-        """Origin defaults to YANG (device) paths
-        Otherwise specify "DME" as origin
-        """
-        if origin is None:
-            if any(map(xpath.startswith, ["/Cisco-NX-OS-device", "/ietf-interfaces"])):
-                origin = "device"
-            else:
-                origin = "DME"
-
-        return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
-
-    def xpath_to_path_elem(self, request):
-        """Convert XML Path Language 1.0 formed xpath to gNMI PathElement.
-
-        Modeled after NETCONF Xpaths RFC 6020 (See client.py for use example).
-
-        References:
-        * https://www.w3.org/TR/1999/REC-xpath-19991116/#location-paths
-        * https://www.w3.org/TR/1999/REC-xpath-19991116/#path-abbrev
-        * https://tools.ietf.org/html/rfc6020#section-6.4
-        * https://tools.ietf.org/html/rfc6020#section-9.13
-
-        Parameters
-        ---------
-        request: dict containing request namespace and nodes to be worked on.
-            namespace: dict of <prefix>: <namespace>
-            nodes: list of dict
-                  <xpath>: Xpath pointing to resource
-                  <value>: value to set resource to
-                  <edit-op>: equivelant NETCONF edit-config operation
-
-        Returns
-        -------
-        tuple: namespace_modules, message dict, origin
-            namespace_modules: dict of <prefix>: <module name>
-                Needed for future support.
-            message dict: 4 lists containing possible updates, replaces,
-                deletes, or gets derived form input nodes.
-            origin str: DME, device, or openconfig
-        """
-        return super(NXClient, self).xml_path_to_path_elem(request)
