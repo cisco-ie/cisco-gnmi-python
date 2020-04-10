@@ -3,30 +3,47 @@
 
 CERT_BASE="certs"
 
-if [ -z $1 ]; then
-    echo "Usage: gen_certs.sh <hostname> <ip> [<password>]"
+if [ -z $1 ] || [ -z $2 ]; then
+    echo "Usage: gen_certs.sh <server_hostname> <ip> [<password>]"
     exit 1
 fi
 
+server_hostname=$1
+ip=$2
+password=$3
+
 mkdir -p $CERT_BASE
 
+function print_red () {
+    printf "\033[0;31m$1 ...\033[0m\n"
+}
+
 # Setting up a CA
+print_red "Generating rootCA"
 openssl genrsa -out $CERT_BASE/rootCA.key 2048
 openssl req -subj /C=/ST=/L=/O=/CN=rootCA -x509 -new -nodes -key $CERT_BASE/rootCA.key -sha256 -days 1095 -out $CERT_BASE/rootCA.pem
 
 # Setting up device cert and key
+print_red "Generating device certificates with CN $server_hostname and IP $ip"
 openssl genrsa -out $CERT_BASE/device.key 2048
-openssl req -subj /C=/ST=/L=/O=/CN=$1 -new -key $CERT_BASE/device.key -out $CERT_BASE/device.csr
-openssl x509 -req -in $CERT_BASE/device.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/device.crt -days 1095 -sha256 -extfile <(printf "%s" "subjectAltName=DNS:$1,IP:$2")
+openssl req -subj /C=/ST=/L=/O=/CN=$server_hostname -new -key $CERT_BASE/device.key -out $CERT_BASE/device.csr
+openssl x509 -req -in $CERT_BASE/device.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/device.crt -days 1095 -sha256 -extfile <(printf "%s" "subjectAltName=DNS:$server_hostname,IP:$ip")
 
-# Encrypt device key - needed for input to IOS
-if [ ! -z $3 ]; then
-    openssl rsa -des3 -in $CERT_BASE/device.key -out $CERT_BASE/device.des3.key -passout pass:$2
+# Encrypt device key
+if [ ! -z $password ]; then
+    print_red "Encrypting device certificates and bundling with password"
+    # DES 3 for device, needed for input to IOS XE
+    openssl rsa -des3 -in $CERT_BASE/device.key -out $CERT_BASE/device.des3.key -passout pass:$password
+    # PKCS #12 for device, needed for NX-OS
+    # Uncertain if this is correct
+    openssl pkcs12 -export -out $CERT_BASE/device.pfx -inkey $CERT_BASE/device.key -in $CERT_BASE/device.crt -certfile $CERT_BASE/device.crt -password pass:$password
 else
-    echo "Skipping device key encryption."
+    print_red "Skipping device key encryption"
 fi
 
 # Setting up client cert and key
+hostname=$(hostname)
+print_red "Generating client certificates with CN $hostname"
 openssl genrsa -out $CERT_BASE/client.key 2048
-openssl req -subj /C=/ST=/L=/O=/CN=gnmi_client -new -key $CERT_BASE/client.key -out $CERT_BASE/client.csr
+openssl req -subj /C=/ST=/L=/O=/CN=$hostname -new -key $CERT_BASE/client.key -out $CERT_BASE/client.csr
 openssl x509 -req -in $CERT_BASE/client.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/client.crt -days 1095 -sha256
