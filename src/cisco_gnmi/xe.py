@@ -312,7 +312,7 @@ class XEClient(Client):
         """
         if origin is None:
             # naive but effective
-            if "openconfig" in xpath:
+            if ":" in xpath:
                 origin = "openconfig"
             else:
                 origin = "rfc7951"
