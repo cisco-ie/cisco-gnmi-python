@@ -1,9 +1,13 @@
 import os
 import re
 import json
+import logger
 from xml.etree.ElementPath import xpath_tokenizer_re
 from six import string_types
 from cisco_gnmi import proto
+
+
+log = logging.getLogger(__name__)
 
 
 def parse_xpath_to_gnmi_path(xpath, origin=None):
