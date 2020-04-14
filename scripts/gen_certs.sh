@@ -40,7 +40,7 @@ if [ ! -z $password ]; then
     openssl rsa -des3 -in $CERT_BASE/device.key -out $CERT_BASE/device.des3.key -passout pass:$password
     # PKCS #12 for device, needed for NX-OS
     # Uncertain if this is correct
-    openssl pkcs12 -export -out $CERT_BASE/device.pfx -inkey $CERT_BASE/device.key -in $CERT_BASE/device.crt -certfile $CERT_BASE/device.crt -password pass:$password
+    openssl pkcs12 -export -out $CERT_BASE/device.pfx -inkey $CERT_BASE/device.key -in $CERT_BASE/device.crt -certfile $CERT_BASE/rootCA.pem -password pass:$password
 else
     print_red "SKIPPING device key encryption"
 fi
