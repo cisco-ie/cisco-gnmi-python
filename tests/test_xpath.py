@@ -1,6 +1,6 @@
 import pytest
 
-from cisco_gnmi import xpath_util
+from src.cisco_gnmi import xpath_util
 
 
 def test_parse_xpath_to_gnmi_path(xpath, origin=None):
