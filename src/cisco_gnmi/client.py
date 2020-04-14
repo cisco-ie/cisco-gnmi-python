@@ -31,9 +31,9 @@ import json
 import os
 from six import string_types
 
-from cisco_gnmi import proto
-from cisco_gnmi import util
-from cisco_gnmi.xpath_util import get_payload, parse_xpath_to_gnmi_path
+from . import proto
+from . import util
+from .xpath_util import get_payload, parse_xpath_to_gnmi_path
 
 
 class Client(object):
@@ -268,9 +268,7 @@ class Client(object):
             logger.debug("Handling already serialized JSON object.")
             configs = [configs]
         elif not isinstance(configs, (list, set)):
-            raise Exception(
-                "{0} must be an iterable of configs!".format(str(configs))
-            )
+            raise Exception("{0} must be an iterable of configs!".format(str(configs)))
         return configs
 
     def create_updates(self, configs, origin, json_ietf=False):
@@ -310,11 +308,7 @@ class Client(object):
             for update_cfg in update_configs:
                 xpath, payload = update_cfg
                 update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(
-                    parse_xpath_to_gnmi_path(
-                        xpath, origin=origin
-                    )
-                )
+                update.path.CopyFrom(parse_xpath_to_gnmi_path(xpath, origin=origin))
                 if json_ietf:
                     update.val.json_ietf_val = payload
                 else:

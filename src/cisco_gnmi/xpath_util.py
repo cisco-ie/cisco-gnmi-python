@@ -1,9 +1,13 @@
 import os
 import re
 import json
+import logging
 from xml.etree.ElementPath import xpath_tokenizer_re
 from six import string_types
-from cisco_gnmi import proto
+from . import proto
+
+
+log = logging.getLogger(__name__)
 
 
 def parse_xpath_to_gnmi_path(xpath, origin=None):
@@ -108,22 +112,22 @@ def combine_configs(payload, last_xpath, cfg):
     config: dict of values associated to colliding xpath
     """
     xpath, config, is_key = cfg
-    lp = last_xpath.split('/')
-    xp = xpath.split('/')
+    lp = last_xpath.split("/")
+    xp = xpath.split("/")
     base = []
-    top = ''
+    top = ""
     for i, seg in enumerate(zip(lp, xp)):
         if seg[0] != seg[1]:
             top = seg[1]
             break
-    base = '/' + '/'.join(xp[i:])
+    base = "/" + "/".join(xp[i:])
     cfg = (base, config, False)
     extended_payload = {top: xpath_to_json([cfg])}
     payload.update(extended_payload)
     return payload
 
 
-def xpath_to_json(configs, last_xpath='', payload={}):
+def xpath_to_json(configs, last_xpath="", payload={}):
     """Try to combine Xpaths/values into a common payload (recursive).
 
     Parameters
@@ -145,7 +149,7 @@ def xpath_to_json(configs, last_xpath='', payload={}):
             #   |---this xpath config
             payload = combine_configs(payload, last_xpath, cfg)
             return xpath_to_json(configs[i:], xpath, payload)
-        xpath_segs = xpath.split('/')
+        xpath_segs = xpath.split("/")
         xpath_segs.reverse()
         for seg in xpath_segs:
             if not seg:
@@ -174,7 +178,7 @@ def xpath_to_json(configs, last_xpath='', payload={}):
 
 
 # Pattern to detect keys in an xpath
-RE_FIND_KEYS = re.compile(r'\[.*?\]')
+RE_FIND_KEYS = re.compile(r"\[.*?\]")
 
 
 def get_payload(configs):
@@ -182,7 +186,7 @@ def get_payload(configs):
 
     Parameter
     ---------
-    configs: tuple of xpath/value dicts
+    configs: list of {xpath: {name: value}} dicts
     """
     # Number of updates are limited so try to consolidate into lists.
     xpaths_cfg = []
@@ -194,9 +198,9 @@ def get_payload(configs):
         # Change configs to tuples (xpath, config) for easier management
         xpaths_cfg.append((xpath, config[xpath]))
 
-        xpath_split = xpath.split('/')
+        xpath_split = xpath.split("/")
         for seg in xpath_split:
-            if '[' in seg:
+            if "[" in seg:
                 first_key.add(seg)
                 break
 
@@ -254,14 +258,14 @@ def get_payload(configs):
         config_compressed.reverse()
         for seg in config_compressed:
             is_key = False
-            prepend_path = ''
+            prepend_path = ""
             xpath, config = seg
-            end_path = xpath[len(common_xpath):]
-            if end_path.startswith('['):
+            end_path = xpath[len(common_xpath) :]
+            if end_path.startswith("["):
                 # Don't start payload with a list
-                tmp = common_xpath.split('/')
-                prepend_path = '/' + tmp.pop()
-                common_xpath = '/'.join(tmp)
+                tmp = common_xpath.split("/")
+                prepend_path = "/" + tmp.pop()
+                common_xpath = "/".join(tmp)
             end_path = prepend_path + end_path
 
             # Building json, need to identify configs that set keys
@@ -278,12 +282,7 @@ def get_payload(configs):
     for update in compressed_updates:
         common_xpath, cfgs = update
         payload = xpath_to_json(cfgs)
-        updates.append(
-            (
-                common_xpath,
-                json.dumps(payload).encode('utf-8')
-            )
-        )
+        updates.append((common_xpath, json.dumps(payload).encode("utf-8")))
     return updates
 
 
@@ -320,144 +319,128 @@ def xml_path_to_path_elem(request):
 
     paths = []
     message = {
-        'update': [],
-        'replace': [],
-        'delete': [],
-        'get': [],
+        "update": [],
+        "replace": [],
+        "delete": [],
+        "get": [],
     }
-    if 'nodes' not in request:
+    if "nodes" not in request:
         # TODO: raw rpc?
         return paths
     else:
         namespace_modules = {}
-        origin = 'DME'
-        for prefix, nspace in request.get('namespace', {}).items():
-            if '/Cisco-IOS-' in nspace:
-                module = nspace[nspace.rfind('/') + 1:]
-            elif '/cisco-nx' in nspace: # NXOS lowercases namespace
-                module = 'Cisco-NX-OS-device'
-            elif '/openconfig.net' in nspace:
-                module = 'openconfig-'
-                module += nspace[nspace.rfind('/') + 1:]
-            elif 'urn:ietf:params:xml:ns:yang:' in nspace:
-                module = nspace.replace(
-                    'urn:ietf:params:xml:ns:yang:', '')
+        origin = "DME"
+        for prefix, nspace in request.get("namespace", {}).items():
+            if "/Cisco-IOS-" in nspace:
+                module = nspace[nspace.rfind("/") + 1 :]
+            elif "/cisco-nx" in nspace:  # NXOS lowercases namespace
+                module = "Cisco-NX-OS-device"
+            elif "/openconfig.net" in nspace:
+                module = "openconfig-"
+                module += nspace[nspace.rfind("/") + 1 :]
+            elif "urn:ietf:params:xml:ns:yang:" in nspace:
+                module = nspace.replace("urn:ietf:params:xml:ns:yang:", "")
             if module:
                 namespace_modules[prefix] = module
 
-        for node in request.get('nodes', []):
-            if 'xpath' not in node:
-                log.error('Xpath is not in message')
+        for node in request.get("nodes", []):
+            if "xpath" not in node:
+                log.error("Xpath is not in message")
             else:
-                xpath = node['xpath']
-                value = node.get('value', '')
-                edit_op = node.get('edit-op', '')
+                xpath = node["xpath"]
+                value = node.get("value", "")
+                edit_op = node.get("edit-op", "")
 
                 for pfx, ns in namespace_modules.items():
                     # NXOS does not support prefixes yet so clear them out
-                    if pfx in xpath and 'openconfig' in ns:
-                        origin = 'openconfig'
-                        xpath = xpath.replace(pfx + ':', '')
+                    if pfx in xpath and "openconfig" in ns:
+                        origin = "openconfig"
+                        xpath = xpath.replace(pfx + ":", "")
                         if isinstance(value, string_types):
-                            value = value.replace(pfx + ':', '')
-                    elif pfx in xpath and 'device' in ns:
-                        origin = 'device'
-                        xpath = xpath.replace(pfx + ':', '')
+                            value = value.replace(pfx + ":", "")
+                    elif pfx in xpath and "device" in ns:
+                        origin = "device"
+                        xpath = xpath.replace(pfx + ":", "")
                         if isinstance(value, string_types):
-                            value = value.replace(pfx + ':', '')
+                            value = value.replace(pfx + ":", "")
                 if edit_op:
-                    if edit_op in ['create', 'merge', 'replace']:
-                        xpath_lst = xpath.split('/')
+                    if edit_op in ["create", "merge", "replace"]:
+                        xpath_lst = xpath.split("/")
                         name = xpath_lst.pop()
-                        xpath = '/'.join(xpath_lst)
-                        if edit_op == 'replace':
-                            if not message['replace']:
-                                message['replace'] = [{
-                                    xpath: {name: value}
-                                }]
+                        xpath = "/".join(xpath_lst)
+                        if edit_op == "replace":
+                            if not message["replace"]:
+                                message["replace"] = [{xpath: {name: value}}]
                             else:
-                                message['replace'].append(
-                                    {xpath: {name: value}}
-                                )
+                                message["replace"].append({xpath: {name: value}})
                         else:
-                            if not message['update']:
-                                message['update'] = [{
-                                    xpath: {name: value}
-                                }]
+                            if not message["update"]:
+                                message["update"] = [{xpath: {name: value}}]
                             else:
-                                message['update'].append(
-                                    {xpath: {name: value}}
-                                )
-                    elif edit_op in ['delete', 'remove']:
-                        if message['delete']:
-                            message['delete'].add(xpath)
+                                message["update"].append({xpath: {name: value}})
+                    elif edit_op in ["delete", "remove"]:
+                        if message["delete"]:
+                            message["delete"].add(xpath)
                         else:
-                            message['delete'] = set(xpath)
+                            message["delete"] = set(xpath)
                 else:
-                    message['get'].append(xpath)
+                    message["get"].append(xpath)
     return namespace_modules, message, origin
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from pprint import pprint as pp
     import grpc
     from cisco_gnmi.auth import CiscoAuthPlugin
     from cisco_gnmi.client import Client
 
     channel = grpc.secure_channel(
-        '127.0.0.1:9339',
+        "127.0.0.1:9339",
         grpc.composite_channel_credentials(
             grpc.ssl_channel_credentials(),
-            grpc.metadata_call_credentials(
-                CiscoAuthPlugin(
-                        'admin',
-                        'its_a_secret'
-                )
-            )
-        )
+            grpc.metadata_call_credentials(CiscoAuthPlugin("admin", "its_a_secret")),
+        ),
     )
     client = Client(channel)
     request = {
-        'namespace': {
-            'oc-acl': 'http://openconfig.net/yang/acl'
-        },
-        'nodes': [
+        "namespace": {"oc-acl": "http://openconfig.net/yang/acl"},
+        "nodes": [
             {
-                'value': 'testacl',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set/name',
-                'edit-op': 'merge'
+                "value": "testacl",
+                "xpath": "/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set/name",
+                "edit-op": "merge",
             },
             {
-                'value': 'ACL_IPV4',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set/type',
-                'edit-op': 'merge'
+                "value": "ACL_IPV4",
+                "xpath": "/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set/type",
+                "edit-op": "merge",
             },
             {
-                'value': '10',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry/oc-acl:sequence-id',
-                'edit-op': 'merge'
+                "value": "10",
+                "xpath": '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry/oc-acl:sequence-id',
+                "edit-op": "merge",
             },
             {
-                'value': '20.20.20.1/32',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:destination-address',
-                'edit-op': 'merge'
+                "value": "20.20.20.1/32",
+                "xpath": '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:destination-address',
+                "edit-op": "merge",
             },
             {
-                'value': 'IP_TCP',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:protocol',
-                'edit-op': 'merge'
+                "value": "IP_TCP",
+                "xpath": '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:protocol',
+                "edit-op": "merge",
             },
             {
-                'value': '10.10.10.10/32',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:source-address',
-                'edit-op': 'merge'
+                "value": "10.10.10.10/32",
+                "xpath": '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:ipv4/oc-acl:config/oc-acl:source-address',
+                "edit-op": "merge",
             },
             {
-                'value': 'DROP',
-                'xpath': '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:actions/oc-acl:config/oc-acl:forwarding-action',
-                'edit-op': 'merge'
-            }
-        ]
+                "value": "DROP",
+                "xpath": '/oc-acl:acl/oc-acl:acl-sets/oc-acl:acl-set[name="testacl"][type="ACL_IPV4"]/oc-acl:acl-entries/oc-acl:acl-entry[sequence-id="10"]/oc-acl:actions/oc-acl:config/oc-acl:forwarding-action',
+                "edit-op": "merge",
+            },
+        ],
     }
     modules, message, origin = xml_path_to_path_elem(request)
     pp(modules)
@@ -480,7 +463,7 @@ if __name__ == '__main__':
     'openconfig'
     """
     # Feed converted XML Path Language 1.0 Xpaths to create updates
-    updates = client.create_updates(message['update'], origin)
+    updates = client.create_updates(message["update"], origin)
     pp(updates)
     """
     # Expected output
