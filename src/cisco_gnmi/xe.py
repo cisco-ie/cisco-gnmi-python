@@ -28,9 +28,9 @@ import logging
 import os
 
 from six import string_types
-from cisco_gnmi import proto, util
-from cisco_gnmi.client import Client
-from cisco_gnmi.xpath_util import parse_xpath_to_gnmi_path
+from . import proto, util
+from .client import Client
+from .xpath_util import parse_xpath_to_gnmi_path
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -81,6 +81,7 @@ class XEClient(Client):
     ...
     >>> delete_response = client.delete_xpaths('/Cisco-IOS-XE-native:native/hostname')
     """
+
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
         to be passed to set() as the delete parameter.
@@ -113,8 +114,13 @@ class XEClient(Client):
             paths.append(parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
-    def set_json(self, update_json_configs=None, replace_json_configs=None,
-                 origin='device', json_ietf=True):
+    def set_json(
+        self,
+        update_json_configs=None,
+        replace_json_configs=None,
+        origin="device",
+        json_ietf=True,
+    ):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -137,17 +143,13 @@ class XEClient(Client):
             raise Exception("Must supply at least one set of configurations to method!")
 
         updates = self.create_updates(
-            update_json_configs,
-            origin=origin,
-            json_ietf=json_ietf
+            update_json_configs, origin=origin, json_ietf=json_ietf
         )
         replaces = self.create_updates(
-            replace_json_configs,
-            origin=origin,
-            json_ietf=json_ietf
+            replace_json_configs, origin=origin, json_ietf=json_ietf
         )
         for update in updates + replaces:
-            logger.debug('\nGNMI set:\n{0}\n{1}'.format(9 * '=', str(update)))
+            logger.debug("\nGNMI set:\n{0}\n{1}".format(9 * "=", str(update)))
 
         return self.set(updates=updates, replaces=replaces)
 
@@ -189,7 +191,7 @@ class XEClient(Client):
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
-        logger.debug('GNMI get:\n{0}\n{1}'.format(9 * '=', str(gnmi_path)))
+        logger.debug("GNMI get:\n{0}\n{1}".format(9 * "=", str(gnmi_path)))
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def subscribe_xpaths(
@@ -199,7 +201,7 @@ class XEClient(Client):
         sub_mode="SAMPLE",
         encoding="JSON_IETF",
         sample_interval=Client._NS_IN_S * 10,
-        origin='openconfig'
+        origin="openconfig",
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -263,10 +265,7 @@ class XEClient(Client):
             if isinstance(xpath_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
-                    parse_xpath_to_gnmi_path(
-                        xpath_subscription,
-                        origin
-                    )
+                    parse_xpath_to_gnmi_path(xpath_subscription, origin)
                 )
                 subscription.mode = util.validate_proto_enum(
                     "sub_mode",
@@ -277,10 +276,7 @@ class XEClient(Client):
                 )
                 subscription.sample_interval = sample_interval
             elif isinstance(xpath_subscription, dict):
-                path = parse_xpath_to_gnmi_path(
-                    xpath_subscription["path"],
-                    origin
-                )
+                path = parse_xpath_to_gnmi_path(xpath_subscription["path"], origin)
                 arg_dict = {
                     "path": path,
                     "mode": sub_mode,
@@ -302,7 +298,7 @@ class XEClient(Client):
                 raise Exception("xpath in list must be xpath or dict/Path!")
             subscriptions.append(subscription)
         subscription_list.subscription.extend(subscriptions)
-        logger.debug('GNMI subscribe:\n{0}\n{1}'.format(
-            15 * '=', str(subscription_list))
+        logger.debug(
+            "GNMI subscribe:\n{0}\n{1}".format(15 * "=", str(subscription_list))
         )
         return self.subscribe([subscription_list])

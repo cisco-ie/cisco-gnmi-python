@@ -22,7 +22,7 @@ mostlyclean:
 ## Runs tests.
 .PHONY: test
 test:
-	pipenv run pytest $(TEST_DIR) -v -s --disable-warnings
+	pipenv run pytest $(TEST_DIR) -vv -s --disable-warnings
 
 ## Creates coverage report.
 .PHONY: coverage
