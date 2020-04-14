@@ -1,29 +1,63 @@
+import json
 from src.cisco_gnmi import xpath_util
 
 
-def test_parse_xpath_to_gnmi_path(xpath, origin=None):
+def test_parse_xpath_to_gnmi_path():
     result = xpath_util.parse_xpath_to_gnmi_path(
-        PARSE_XPATH_TO_GNMI,
+        '/acl/acl-sets/acl-set',
         origin='openconfig'
     )
-    assert result == GNMI_UPDATE
+    assert str(result) == GNMI_UPDATE_ACL_SET
 
 
-def test_combine_configs(payload, last_xpath, cfg):
+def test_combine_configs():
     pass
 
 
-def test_xpath_to_json(configs, last_xpath='', payload={}):
+def test_xpath_to_json():
     pass
 
 
-def test_get_payload(configs):
-    pass
+def test_get_payload():
+    result = xpath_util.get_payload(PARSE_XPATH_TO_GNMI[1]['update'])
+    xpath, config = result[0]
+    assert xpath == '/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries'
+    # json_val
+    cfg = json.loads(config)
+    assert cfg == {
+        'acl-entry': [
+            {
+                'config': {'forwarding-action': 'DROP'},
+                'ipv4': {'config': {'destination-address': '20.20.20.1/32',
+                                    'protocol': 'IP_TCP',
+                                    'source-address': '10.10.10.10/32'}
+                },
+                'sequence-id': '10'
+            }
+        ]
+    }
 
 
-def test_xml_path_to_path_elem(request):
+def test_xml_path_to_path_elem():
     result = xpath_util.xml_path_to_path_elem(XML_PATH_LANGUAGE_1)
-    assert result == PARSE_XPATH_TO_GNMI
+    assert result == (
+        {'oc-acl': 'openconfig-acl'},  # module
+        {  # config
+            'delete': [],
+            'get': [],
+            'replace': [],
+            'update': [
+                {'/acl/acl-sets/acl-set': {'name': 'testacl'}},
+                {'/acl/acl-sets/acl-set': {'type': 'ACL_IPV4'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry': {'sequence-id': '10'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'destination-address': '20.20.20.1/32'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'protocol': 'IP_TCP'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'source-address': '10.10.10.10/32'}},
+                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/actions/config': {'forwarding-action': 'DROP'}}
+            ]
+        },
+        'openconfig'  # origin
+    )
 
 
 XML_PATH_LANGUAGE_1 = {
@@ -70,22 +104,27 @@ XML_PATH_LANGUAGE_1 = {
 }
 
 
-PARSE_XPATH_TO_GNMI = {
-    'delete': [],
-    'get': [],
-    'replace': [],
-    'update': [{'/acl/acl-sets/acl-set': {'name': 'testacl'}},
-                {'/acl/acl-sets/acl-set': {'type': 'ACL_IPV4'}},
-                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry': {'sequence-id': '10'}},
-                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'destination-address': '20.20.20.1/32'}},
-                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'protocol': 'IP_TCP'}},
-                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'source-address': '10.10.10.10/32'}},
-                {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/actions/config': {'forwarding-action': 'DROP'}}]
-}
+PARSE_XPATH_TO_GNMI = (
+    {'oc-acl': 'openconfig-acl'},  # module
+    {  # config
+        'delete': [],
+        'get': [],
+        'replace': [],
+        'update': [
+            {'/acl/acl-sets/acl-set': {'name': 'testacl'}},
+            {'/acl/acl-sets/acl-set': {'type': 'ACL_IPV4'}},
+            {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry': {'sequence-id': '10'}},
+            {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'destination-address': '20.20.20.1/32'}},
+            {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'protocol': 'IP_TCP'}},
+            {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/ipv4/config': {'source-address': '10.10.10.10/32'}},
+            {'/acl/acl-sets/acl-set[name="testacl"][type="ACL_IPV4"]/acl-entries/acl-entry[sequence-id="10"]/actions/config': {'forwarding-action': 'DROP'}}
+        ]
+    },
+    'openconfig'  # origin
+)
 
 
-GNMI_UPDATE = """
-[path {
+GNMI_UPDATE_ACL_ENTRY = """[path {
 origin: "openconfig"
 elem {
     name: "acl"
@@ -112,4 +151,17 @@ val {
 json_val: "{\"acl-entry\": [{\"actions\": {\"config\": {\"forwarding-action\": \"DROP\"}}, \"ipv4\": {\"config\": {\"destination-address\": \"20.20.20.1/32\", \"protocol\": \"IP_TCP\", \"source-address\": \"10.10.10.10/32\"}}, \"sequence-id\": \"10\"}]}"
 }
 ]
+"""
+
+
+GNMI_UPDATE_ACL_SET = """origin: "openconfig"
+elem {
+  name: "acl"
+}
+elem {
+  name: "acl-sets"
+}
+elem {
+  name: "acl-set"
+}
 """
