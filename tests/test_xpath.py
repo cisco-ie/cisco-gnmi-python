@@ -1,5 +1,3 @@
-import pytest
-
 from src.cisco_gnmi import xpath_util
 
 
