@@ -34,7 +34,7 @@ import logging
 import argparse
 from getpass import getpass
 from google.protobuf import json_format, text_format
-from . import ClientBuilder, proto
+from . import ClientBuilder, proto, __version__
 from google.protobuf.internal import enum_type_wrapper
 import sys
 
@@ -52,6 +52,8 @@ def main():
         usage="""
 cisco-gnmi <rpc> [<args>]
 
+Version {version}
+
 Supported RPCs:
 {supported_rpcs}
 
@@ -62,7 +64,8 @@ cisco-gnmi subscribe 127.0.0.1:57500 -xpath /interfaces/interface/state/counters
 
 See <rpc> --help for RPC options.
     """.format(
-            supported_rpcs="\n".join(list(rpc_map.keys()))
+            version=__version__,
+            supported_rpcs="\n".join(sorted(list(rpc_map.keys())))
         ),
     )
     parser.add_argument("rpc", help="gNMI RPC to perform against network element.")
