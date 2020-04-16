@@ -60,7 +60,9 @@ def gen_target_netloc(target, netloc_prefix="//", default_port=9339):
     return target_netloc
 
 
-def validate_proto_enum(value_name, value, enum_name, enum, subset=None):
+def validate_proto_enum(
+    value_name, value, enum_name, enum, subset=None, return_name=False
+):
     """Helper function to validate an enum against the proto enum wrapper."""
     enum_value = None
     if value not in enum.keys() and value not in enum.values():
@@ -91,11 +93,15 @@ def validate_proto_enum(value_name, value, enum_name, enum, subset=None):
                 )
         if enum_value not in resolved_subset:
             raise Exception(
-                "{name}={value} not in subset {subset}!".format(
-                    name=value_name, value=enum_value, subset=resolved_subset
+                "{name}={value} ({actual_value}) not in subset {subset} ({actual_subset})!".format(
+                    name=value_name,
+                    value=value,
+                    actual_value=enum_value,
+                    subset=subset,
+                    actual_subset=resolved_subset,
                 )
             )
-    return enum_value
+    return enum_value if not return_name else enum.Name(enum_value)
 
 
 def get_cert_from_target(target_netloc):

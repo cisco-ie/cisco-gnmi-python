@@ -257,12 +257,12 @@ cisco-gnmi capabilities 127.0.0.1:57500 -auto_ssl_target_override
 ```
 cisco-gnmi capabilities --help
 usage: cisco-gnmi [-h] [-os {None,IOS XR,NX-OS,IOS XE}]
-              [-root_certificates ROOT_CERTIFICATES]
-              [-private_key PRIVATE_KEY]
-              [-certificate_chain CERTIFICATE_CHAIN]
-              [-ssl_target_override SSL_TARGET_OVERRIDE]
-              [-auto_ssl_target_override] [-debug]
-              netloc
+                  [-root_certificates ROOT_CERTIFICATES]
+                  [-private_key PRIVATE_KEY]
+                  [-certificate_chain CERTIFICATE_CHAIN]
+                  [-ssl_target_override SSL_TARGET_OVERRIDE]
+                  [-auto_ssl_target_override] [-debug]
+                  netloc
 
 Performs Capabilities RPC against network element.
 
@@ -309,16 +309,17 @@ cisco-gnmi get 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/c
 
 #### Usage
 ```
+cisco-gnmi get --help
 usage: cisco-gnmi [-h] [-xpath XPATH]
-              [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
-              [-data_type [{ALL,CONFIG,STATE,OPERATIONAL}]] [-dump_json]
-              [-os {None,IOS XR,NX-OS,IOS XE}]
-              [-root_certificates ROOT_CERTIFICATES]
-              [-private_key PRIVATE_KEY]
-              [-certificate_chain CERTIFICATE_CHAIN]
-              [-ssl_target_override SSL_TARGET_OVERRIDE]
-              [-auto_ssl_target_override] [-debug]
-              netloc
+                  [-encoding {JSON,BYTES,PROTO,ASCII,JSON_IETF}]
+                  [-data_type {ALL,CONFIG,STATE,OPERATIONAL}] [-dump_json]
+                  [-os {None,IOS XR,NX-OS,IOS XE}]
+                  [-root_certificates ROOT_CERTIFICATES]
+                  [-private_key PRIVATE_KEY]
+                  [-certificate_chain CERTIFICATE_CHAIN]
+                  [-ssl_target_override SSL_TARGET_OVERRIDE]
+                  [-auto_ssl_target_override] [-debug]
+                  netloc
 
 Performs Get RPC against network element.
 
@@ -328,9 +329,9 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   -xpath XPATH          XPaths to Get.
-  -encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]
+  -encoding {JSON,BYTES,PROTO,ASCII,JSON_IETF}
                         gNMI Encoding.
-  -data_type [{ALL,CONFIG,STATE,OPERATIONAL}]
+  -data_type {ALL,CONFIG,STATE,OPERATIONAL}
                         gNMI GetRequest DataType
   -dump_json            Dump as JSON instead of textual protos.
   -os {None,IOS XR,NX-OS,IOS XE}
@@ -381,16 +382,17 @@ Please note that `Set` operations may be destructive to operations and should be
 
 #### Usage
 ```
+cisco-gnmi set --help
 usage: cisco-gnmi [-h] [-update_json_config UPDATE_JSON_CONFIG]
-              [-replace_json_config REPLACE_JSON_CONFIG]
-              [-delete_xpath DELETE_XPATH] [-no_ietf] [-dump_json]
-              [-os {None,IOS XR,NX-OS,IOS XE}]
-              [-root_certificates ROOT_CERTIFICATES]
-              [-private_key PRIVATE_KEY]
-              [-certificate_chain CERTIFICATE_CHAIN]
-              [-ssl_target_override SSL_TARGET_OVERRIDE]
-              [-auto_ssl_target_override] [-debug]
-              netloc
+                  [-replace_json_config REPLACE_JSON_CONFIG]
+                  [-delete_xpath DELETE_XPATH] [-no_ietf] [-dump_json]
+                  [-os {None,IOS XR,NX-OS,IOS XE}]
+                  [-root_certificates ROOT_CERTIFICATES]
+                  [-private_key PRIVATE_KEY]
+                  [-certificate_chain CERTIFICATE_CHAIN]
+                  [-ssl_target_override SSL_TARGET_OVERRIDE]
+                  [-auto_ssl_target_override] [-debug]
+                  netloc
 
 Performs Set RPC against network element.
 
@@ -469,7 +471,8 @@ interface Loopback9339
 ```
 
 ### Subscribe
-This command will output the `SubscribeResponse` to `stdout` or `-dump_file`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`. Subscribe currently only supports a sampled stream. `ON_CHANGE` is possible but not implemented in the CLI, yet. :)
+This command will output the `SubscribeResponse` to `stdout` or `-dump_file`. `-xpath` may be specified multiple times to specify multiple `Path`s for the `GetRequest`.
+
 ```
 cisco-gnmi subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/state/counters -auto_ssl_target_override
 ```
@@ -477,16 +480,19 @@ cisco-gnmi subscribe 127.0.0.1:57500 -os "IOS XR" -xpath /interfaces/interface/s
 #### Usage
 ```
 cisco-gnmi subscribe --help
-usage: cisco-gnmi [-h] [-xpath XPATH] [-interval INTERVAL] [-dump_file DUMP_FILE]
-              [-dump_json] [-sync_stop]
-              [-encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]]
-              [-os {None,IOS XR,NX-OS,IOS XE}]
-              [-root_certificates ROOT_CERTIFICATES]
-              [-private_key PRIVATE_KEY]
-              [-certificate_chain CERTIFICATE_CHAIN]
-              [-ssl_target_override SSL_TARGET_OVERRIDE]
-              [-auto_ssl_target_override] [-debug]
-              netloc
+usage: cisco-gnmi [-h] [-xpath XPATH] [-interval INTERVAL]
+                  [-mode {TARGET_DEFINED,ON_CHANGE,SAMPLE}]
+                  [-suppress_redundant]
+                  [-heartbeat_interval HEARTBEAT_INTERVAL]
+                  [-dump_file DUMP_FILE] [-dump_json] [-sync_stop]
+                  [-sync_start] [-encoding {JSON,BYTES,PROTO,ASCII,JSON_IETF}]
+                  [-os {None,IOS XR,NX-OS,IOS XE}]
+                  [-root_certificates ROOT_CERTIFICATES]
+                  [-private_key PRIVATE_KEY]
+                  [-certificate_chain CERTIFICATE_CHAIN]
+                  [-ssl_target_override SSL_TARGET_OVERRIDE]
+                  [-auto_ssl_target_override] [-debug]
+                  netloc
 
 Performs Subscribe RPC against network element.
 
@@ -498,11 +504,18 @@ optional arguments:
   -xpath XPATH          XPath to subscribe to.
   -interval INTERVAL    Sample interval in seconds for Subscription. Defaults
                         to 10.
+  -mode {TARGET_DEFINED,ON_CHANGE,SAMPLE}
+                        SubscriptionMode for Subscription. Defaults to SAMPLE.
+  -suppress_redundant   Suppress redundant information in Subscription.
+  -heartbeat_interval HEARTBEAT_INTERVAL
+                        Heartbeat interval in seconds.
   -dump_file DUMP_FILE  Filename to dump to. Defaults to stdout.
   -dump_json            Dump as JSON instead of textual protos.
   -sync_stop            Stop on sync_response.
-  -encoding [{JSON,BYTES,PROTO,ASCII,JSON_IETF}]
-                        gNMI Encoding.
+  -sync_start           Start processing messages after sync_response.
+  -encoding {JSON,BYTES,PROTO,ASCII,JSON_IETF}
+                        gNMI Encoding. Defaults to whatever Client wrapper
+                        prefers.
   -os {None,IOS XR,NX-OS,IOS XE}
                         OS wrapper to utilize. Defaults to IOS XR.
   -root_certificates ROOT_CERTIFICATES
