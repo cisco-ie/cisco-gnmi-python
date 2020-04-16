@@ -214,8 +214,11 @@ class XEClient(Client):
     def subscribe_xpaths(
         self,
         xpath_subscriptions,
+        request_mode="STREAM",
+        sub_mode="SAMPLE",
         encoding="JSON_IETF",
         sample_interval=Client._NS_IN_S * 10,
+        suppress_redundant=False,
         heartbeat_interval=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
@@ -233,12 +236,21 @@ class XEClient(Client):
             to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
             dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
             treated as simply a pre-made Subscription.
+        request_mode : proto.gnmi_pb2.SubscriptionList.Mode, optional
+            Indicates whether STREAM to stream from target.
+            [STREAM]
+        sub_mode : proto.gnmi_pb2.SubscriptionMode, optional
+            The default SubscriptionMode on a per Subscription basis in the SubscriptionList.
+            SAMPLE will stream the subscription at a regular cadence/interval.
+            [SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
             A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
-            [JSON, JSON_IETF]
+            [JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
             Defaults to 10 seconds.
+        suppress_redundant : bool, optional
+            Indicates whether values that have not changed should be sent in a SAMPLE subscription.
         heartbeat_interval : int, optional
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
@@ -249,67 +261,41 @@ class XEClient(Client):
         subscribe()
         """
         supported_request_modes = ["STREAM"]
-        request_mode = "STREAM"
-        supported_sub_modes = ["SAMPLE"]
-        sub_mode = "SAMPLE"
-        supported_encodings = ["JSON", "JSON_IETF"]
-        subscription_list = proto.gnmi_pb2.SubscriptionList()
-        subscription_list.mode = util.validate_proto_enum(
+        request_mode = util.validate_proto_enum(
             "mode",
             request_mode,
             "SubscriptionList.Mode",
             proto.gnmi_pb2.SubscriptionList.Mode,
-            supported_request_modes,
+            subset=supported_request_modes,
+            return_name=True,
         )
-        subscription_list.encoding = util.validate_proto_enum(
+        supported_encodings = ["JSON_IETF"]
+        encoding = util.validate_proto_enum(
             "encoding",
             encoding,
             "Encoding",
             proto.gnmi_pb2.Encoding,
-            supported_encodings,
+            subset=supported_encodings,
+            return_name=True,
         )
-        if isinstance(xpath_subscriptions, string_types):
-            xpath_subscriptions = [xpath_subscriptions]
-        subscriptions = []
-        for xpath_subscription in xpath_subscriptions:
-            subscription = None
-            if isinstance(xpath_subscription, string_types):
-                subscription = proto.gnmi_pb2.Subscription()
-                subscription.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(xpath_subscription)
-                )
-                subscription.mode = util.validate_proto_enum(
-                    "sub_mode",
-                    sub_mode,
-                    "SubscriptionMode",
-                    proto.gnmi_pb2.SubscriptionMode,
-                    supported_sub_modes,
-                )
-                subscription.sample_interval = sample_interval
-            elif isinstance(xpath_subscription, dict):
-                path = self.parse_xpath_to_gnmi_path(xpath_subscription["path"])
-                arg_dict = {
-                    "path": path,
-                    "mode": sub_mode,
-                    "sample_interval": sample_interval,
-                }
-                arg_dict.update(xpath_subscription)
-                if "mode" in arg_dict:
-                    arg_dict["mode"] = util.validate_proto_enum(
-                        "sub_mode",
-                        arg_dict["mode"],
-                        "SubscriptionMode",
-                        proto.gnmi_pb2.SubscriptionMode,
-                        supported_sub_modes,
-                    )
-                subscription = proto.gnmi_pb2.Subscription(**arg_dict)
-            elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
-                subscription = xpath_subscription
-            else:
-                raise Exception("xpath in list must be xpath or dict/Path!")
-            subscriptions.append(subscription)
-        subscription_list.subscription.extend(subscriptions)
-        return self.subscribe([subscription_list])
+        supported_sub_modes = ["SAMPLE"]
+        sub_mode = util.validate_proto_enum(
+            "sub_mode",
+            sub_mode,
+            "SubscriptionMode",
+            proto.gnmi_pb2.SubscriptionMode,
+            subset=supported_sub_modes,
+            return_name=True,
+        )
+        return super(XEClient, self).subscribe_xpaths(
+            xpath_subscriptions,
+            request_mode,
+            sub_mode,
+            encoding,
+            sample_interval,
+            suppress_redundant,
+            heartbeat_interval,
+        )
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """Naively tries to intelligently (non-sequitur!) origin
