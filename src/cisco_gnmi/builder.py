@@ -76,9 +76,13 @@ class ClientBuilder(object):
 
     os_class_map = {
         None: Client,
+        "None": Client,
         "IOS XR": XRClient,
+        "XR": XRClient,
         "NX-OS": NXClient,
+        "NX": NXClient,
         "IOS XE": XEClient,
+        "XE": XEClient,
     }
 
     def __init__(self, target):

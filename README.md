@@ -44,6 +44,8 @@ cisco-gnmi --help
 
 This library covers the gNMI defined `Capabilities`, `Get`, `Set`, and `Subscribe` RPCs, and helper clients provide OS-specific recommendations. A CLI (`cisco-gnmi`) is also available upon installation. As commonalities and differences are identified between OS functionality this library will be refactored as necessary.
 
+Several examples of library usage are available in [`examples/`](examples/). The `cisco-gnmi` CLI script found at [`src/cisco_gnmi/cli.py`](src/cisco_gnmi/cli.py) may also be useful.
+
 It is *highly* recommended that users of the library learn [Google Protocol Buffers](https://developers.google.com/protocol-buffers/) syntax to significantly ease usage. Understanding how to read Protocol Buffers, and reference [`gnmi.proto`](https://github.com/openconfig/gnmi/blob/master/proto/gnmi/gnmi.proto), will be immensely useful for utilizing gNMI and any other gRPC interface.
 
 ### cisco-gnmi CLI
