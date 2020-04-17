@@ -51,18 +51,13 @@ def main():
     formatted_messages = []
     try:
         logging.info("Subscribing to %s ...", args.xpath)
-        subscription_list = proto.gnmi_pb2.SubscriptionList()
-        subscription_list.mode = proto.gnmi_pb2.SubscriptionList.Mode.Value("STREAM")
+        sub_args = {"xpath_subscriptions": args.xpath, "sub_mode": "ON_CHANGE"}
         if args.encoding:
-            subscription_list.encoding = proto.gnmi_pb2.Encoding.Value(args.encoding)
-        subscription = proto.gnmi_pb2.Subscription()
-        subscription.path.CopyFrom(client.parse_xpath_to_gnmi_path(args.xpath))
-        subscription.mode = proto.gnmi_pb2.SubscriptionMode.Value("ON_CHANGE")
-        subscription_list.subscription.append(subscription)
-        synced = False
+            sub_args["encoding"] = args.encoding
         if not args.process_all:
             logging.info("Ignoring messages before sync_response.")
-        for message in client.subscribe([subscription_list]):
+        synced = False
+        for message in client.subscribe_xpaths(**sub_args):
             if message.sync_response:
                 synced = True
                 logging.info("Synced with latest state.")
