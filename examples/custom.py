@@ -115,7 +115,8 @@ Let's do an update.
 input("Press Enter for Set update...")
 set_update = proto.gnmi_pb2.Update()
 # This is the fully modeled JSON we want to update with
-update_json = json.loads("""
+update_json = json.loads(
+    """
 {
     "openconfig-interfaces:interfaces": {
         "interface": [
@@ -125,7 +126,8 @@ update_json = json.loads("""
         ]
     }
 }
-""")
+"""
+)
 # Let's just do an update from the very top element
 top_element = next(iter(update_json.keys()))
 set_update.path.CopyFrom(client.parse_xpath_to_gnmi_path(top_element))

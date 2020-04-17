@@ -82,7 +82,7 @@ class ClientBuilder(object):
         "NX-OS": NXClient,
         "NX": NXClient,
         "IOS XE": XEClient,
-        "XE": XEClient
+        "XE": XEClient,
     }
 
     def __init__(self, target):

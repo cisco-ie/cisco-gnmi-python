@@ -64,8 +64,7 @@ cisco-gnmi subscribe 127.0.0.1:57500 -xpath /interfaces/interface/state/counters
 
 See <rpc> --help for RPC options.
     """.format(
-            version=__version__,
-            supported_rpcs="\n".join(sorted(list(rpc_map.keys())))
+            version=__version__, supported_rpcs="\n".join(sorted(list(rpc_map.keys())))
         ),
     )
     parser.add_argument("rpc", help="gNMI RPC to perform against network element.")
