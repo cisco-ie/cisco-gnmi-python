@@ -24,16 +24,11 @@ the License.
 """Python gNMI wrapper to ease usage of gNMI."""
 
 import logging
-from collections import OrderedDict
 from xml.etree.ElementPath import xpath_tokenizer_re
-import re
-import json
-import os
 from six import string_types
 
 from . import proto
 from . import util
-from .xpath_util import get_payload, parse_xpath_to_gnmi_path
 
 
 class Client(object):
@@ -256,74 +251,220 @@ class Client(object):
         )
         return response_stream
 
-    def check_configs(self, configs):
-        if isinstance(configs, string_types):
-            logger.debug("Handling as JSON string.")
-            try:
-                configs = json.loads(configs)
-            except:
-                raise Exception("{0}\n is invalid JSON!".format(configs))
-            configs = [configs]
-        elif isinstance(configs, dict):
-            logger.debug("Handling already serialized JSON object.")
-            configs = [configs]
-        elif not isinstance(configs, (list, set)):
-            raise Exception("{0} must be an iterable of configs!".format(str(configs)))
-        return configs
+    def subscribe_xpaths(
+        self,
+        xpath_subscriptions,
+        request_mode="STREAM",
+        sub_mode="SAMPLE",
+        encoding="JSON",
+        sample_interval=_NS_IN_S * 10,
+        suppress_redundant=False,
+        heartbeat_interval=None,
+    ):
+        """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
+        with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
+        dictionaries with Subscription attributes for more granularity, or already built Subscription
+        objects and builds the SubscriptionList. Fields not supplied will be defaulted with the default arguments
+        to the method.
 
-    def create_updates(self, configs, origin, json_ietf=False):
-        """Check configs, and construct "Update" messages.
+        Generates a single SubscribeRequest.
 
         Parameters
         ----------
-        configs: dict of <xpath>: <dict val for JSON>
-        origin: str [DME, device, openconfig]
-        json_ietf: bool encoding type for Update val (default False)
+        xpath_subscriptions : str or iterable of str, dict, Subscription
+            An iterable which is parsed to form the Subscriptions in the SubscriptionList to be passed
+            to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
+            dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
+            treated as simply a pre-made Subscription.
+        request_mode : proto.gnmi_pb2.SubscriptionList.Mode, optional
+            Indicates whether STREAM to stream from target,
+            ONCE to stream once (like a get),
+            POLL to respond to POLL.
+            [STREAM, ONCE, POLL]
+        sub_mode : proto.gnmi_pb2.SubscriptionMode, optional
+            The default SubscriptionMode on a per Subscription basis in the SubscriptionList.
+            TARGET_DEFINED indicates that the target (like device/destination) should stream
+            information however it knows best. This instructs the target to decide between ON_CHANGE
+            or SAMPLE - e.g. the device gNMI server may understand that we only need RIB updates
+            as an ON_CHANGE basis as opposed to SAMPLE, and we don't have to explicitly state our
+            desired behavior.
+            ON_CHANGE only streams updates when changes occur.
+            SAMPLE will stream the subscription at a regular cadence/interval.
+            [TARGET_DEFINED, ON_CHANGE, SAMPLE]
+        encoding : proto.gnmi_pb2.Encoding, optional
+            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
+            [JSON, BYTES, PROTO, ASCII, JSON_IETF]
+        sample_interval : int, optional
+            Default nanoseconds for SAMPLE to occur.
+            Defaults to 10 seconds.
+        suppress_redundant : bool, optional
+            Indicates whether values that have not changed should be sent in a SAMPLE subscription.
+        heartbeat_interval : int, optional
+            Specifies the maximum allowable silent period in nanoseconds when
+            suppress_redundant is in use. The target should send a value at least once
+            in the period specified. Also applies in ON_CHANGE.
 
         Returns
         -------
-        List of Update messages with val populated.
-
-        If a set of configs contain a common Xpath, the Update must contain
-        a consolidation of xpath/values for 2 reasons:
-
-        1. Devices may have a restriction on how many Update messages it will
-           accept at once.
-        2. Some xpath/values are required to be set in same Update because of
-           dependencies like leafrefs, mandatory settings, and if/when/musts.
+        subscribe()
         """
-        if not configs:
-            return []
-        configs = self.check_configs(configs)
-
-        xpaths = []
-        updates = []
-        for config in configs:
-            xpath = next(iter(config.keys()))
-            xpaths.append(xpath)
-        common_xpath = os.path.commonprefix(xpaths)
-
-        if common_xpath:
-            update_configs = get_payload(configs)
-            for update_cfg in update_configs:
-                xpath, payload = update_cfg
-                update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(parse_xpath_to_gnmi_path(xpath, origin=origin))
-                if json_ietf:
-                    update.val.json_ietf_val = payload
+        subscription_list = proto.gnmi_pb2.SubscriptionList()
+        subscription_list.mode = util.validate_proto_enum(
+            "mode",
+            request_mode,
+            "SubscriptionList.Mode",
+            proto.gnmi_pb2.SubscriptionList.Mode,
+        )
+        subscription_list.encoding = util.validate_proto_enum(
+            "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
+        )
+        if isinstance(
+            xpath_subscriptions, (string_types, dict, proto.gnmi_pb2.Subscription)
+        ):
+            xpath_subscriptions = [xpath_subscriptions]
+        subscriptions = []
+        for xpath_subscription in xpath_subscriptions:
+            subscription = None
+            if isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
+                subscription = xpath_subscription
+            elif isinstance(xpath_subscription, string_types):
+                subscription = proto.gnmi_pb2.Subscription()
+                subscription.path.CopyFrom(
+                    self.parse_xpath_to_gnmi_path(xpath_subscription)
+                )
+                subscription.mode = util.validate_proto_enum(
+                    "sub_mode",
+                    sub_mode,
+                    "SubscriptionMode",
+                    proto.gnmi_pb2.SubscriptionMode,
+                )
+                if sub_mode == "SAMPLE":
+                    subscription.sample_interval = sample_interval
+            elif isinstance(xpath_subscription, dict):
+                subscription_dict = {}
+                if "path" not in xpath_subscription.keys():
+                    raise Exception("path must be specified in dict!")
+                if isinstance(xpath_subscription["path"], proto.gnmi_pb2.Path):
+                    subscription_dict["path"] = xpath_subscription["path"]
+                elif isinstance(xpath_subscription["path"], string_types):
+                    subscription_dict["path"] = self.parse_xpath_to_gnmi_path(
+                        xpath_subscription["path"]
+                    )
                 else:
-                    update.val.json_val = payload
-                updates.append(update)
-            return updates
-        else:
-            for config in configs:
-                top_element = next(iter(config.keys()))
-                update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(parse_xpath_to_gnmi_path(top_element))
-                config = config.pop(top_element)
-                if json_ietf:
-                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
+                    raise Exception("path must be string or Path proto!")
+                sub_mode_name = (
+                    sub_mode
+                    if "mode" not in xpath_subscription.keys()
+                    else xpath_subscription["mode"]
+                )
+                subscription_dict["mode"] = util.validate_proto_enum(
+                    "sub_mode",
+                    sub_mode,
+                    "SubscriptionMode",
+                    proto.gnmi_pb2.SubscriptionMode,
+                )
+                if sub_mode_name == "SAMPLE":
+                    subscription_dict["sample_interval"] = (
+                        sample_interval
+                        if "sample_interval" not in xpath_subscription.keys()
+                        else xpath_subscription["sample_interval"]
+                    )
+                    if "suppress_redundant" in xpath_subscription.keys():
+                        subscription_dict["suppress_redundant"] = xpath_subscription[
+                            "suppress_redundant"
+                        ]
+                if sub_mode_name != "TARGET_DEFINED":
+                    if "heartbeat_interval" in xpath_subscription.keys():
+                        subscription_dict["heartbeat_interval"] = xpath_subscription[
+                            "heartbeat_interval"
+                        ]
+                subscription = proto.gnmi_pb2.Subscription(**subscription_dict)
+            else:
+                raise Exception("path must be string, dict, or Subscription proto!")
+            subscriptions.append(subscription)
+        subscription_list.subscription.extend(subscriptions)
+        return self.subscribe([subscription_list])
+
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """Parses an XPath to proto.gnmi_pb2.Path.
+        This function should be overridden by any child classes for origin logic.
+
+        Effectively wraps the std XML XPath tokenizer and traverses
+        the identified groups. Parsing robustness needs to be validated.
+        Probably best to formalize as a state machine sometime.
+        TODO: Formalize tokenizer traversal via state machine.
+        """
+        if not isinstance(xpath, string_types):
+            raise Exception("xpath must be a string!")
+        path = proto.gnmi_pb2.Path()
+        if origin:
+            if not isinstance(origin, string_types):
+                raise Exception("origin must be a string!")
+            path.origin = origin
+        curr_elem = proto.gnmi_pb2.PathElem()
+        in_filter = False
+        just_filtered = False
+        curr_key = None
+        # TODO: Lazy
+        xpath = xpath.strip("/")
+        xpath_elements = xpath_tokenizer_re.findall(xpath)
+        path_elems = []
+        for index, element in enumerate(xpath_elements):
+            # stripped initial /, so this indicates a completed element
+            if element[0] == "/":
+                if not curr_elem.name:
+                    raise Exception(
+                        "Current PathElem has no name yet is trying to be pushed to path! Invalid XPath?"
+                    )
+                path_elems.append(curr_elem)
+                curr_elem = proto.gnmi_pb2.PathElem()
+                continue
+            # We are entering a filter
+            elif element[0] == "[":
+                in_filter = True
+                continue
+            # We are exiting a filter
+            elif element[0] == "]":
+                in_filter = False
+                continue
+            # If we're not in a filter then we're a PathElem name
+            elif not in_filter:
+                curr_elem.name = element[1]
+            # Skip blank spaces
+            elif not any([element[0], element[1]]):
+                continue
+            # If we're in the filter and just completed a filter expr,
+            # "and" as a junction should just be ignored.
+            elif in_filter and just_filtered and element[1] == "and":
+                just_filtered = False
+                continue
+            # Otherwise we're in a filter and this term is a key name
+            elif curr_key is None:
+                curr_key = element[1]
+                continue
+            # Otherwise we're an operator or the key value
+            elif curr_key is not None:
+                # I think = is the only possible thing to support with PathElem syntax as is
+                if element[0] in [">", "<"]:
+                    raise Exception("Only = supported as filter operand!")
+                if element[0] == "=":
+                    continue
                 else:
-                    update.val.json_val = json.dumps(config).encode("utf-8")
-                updates.append(update)
-            return updates
+                    # We have a full key here, put it in the map
+                    if curr_key in curr_elem.key.keys():
+                        raise Exception("Key already in key map!")
+                    curr_elem.key[curr_key] = element[0].strip("'\"")
+                    curr_key = None
+                    just_filtered = True
+        # Keys/filters in general should be totally cleaned up at this point.
+        if curr_key:
+            raise Exception("Hanging key filter! Incomplete XPath?")
+        # If we have a dangling element that hasn't been completed due to no
+        # / element then let's just append the final element.
+        if curr_elem:
+            path_elems.append(curr_elem)
+            curr_elem = None
+        if any([curr_elem, curr_key, in_filter]):
+            raise Exception("Unfinished elements in XPath parsing!")
+        path.elem.extend(path_elems)
+        return path

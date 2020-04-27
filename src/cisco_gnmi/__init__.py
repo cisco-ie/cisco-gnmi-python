@@ -29,6 +29,5 @@ from .xr import XRClient
 from .nx import NXClient
 from .xe import XEClient
 from .builder import ClientBuilder
-from . import xpath_util
 
-__version__ = "1.0.4"
+__version__ = "1.0.7"

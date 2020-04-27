@@ -25,15 +25,9 @@ the License.
 
 import json
 import logging
-import os
 
 from six import string_types
-from . import proto, util
-from .client import Client
-from .xpath_util import parse_xpath_to_gnmi_path
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from .client import Client, proto, util
 
 
 class XEClient(Client):
@@ -111,16 +105,10 @@ class XEClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            paths.append(parse_xpath_to_gnmi_path(xpath))
+            paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
-    def set_json(
-        self,
-        update_json_configs=None,
-        replace_json_configs=None,
-        origin="device",
-        json_ietf=True,
-    ):
+    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -133,7 +121,8 @@ class XEClient(Client):
             JSON configs to apply as updates.
         replace_json_configs : iterable of JSON configurations, optional
             JSON configs to apply as replacements.
-        origin : openconfig, device, or DME
+        ietf : bool, optional
+            Use JSON_IETF vs JSON.
 
         Returns
         -------
@@ -142,18 +131,49 @@ class XEClient(Client):
         if not any([update_json_configs, replace_json_configs]):
             raise Exception("Must supply at least one set of configurations to method!")
 
-        updates = self.create_updates(
-            update_json_configs, origin=origin, json_ietf=json_ietf
-        )
-        replaces = self.create_updates(
-            replace_json_configs, origin=origin, json_ietf=json_ietf
-        )
-        for update in updates + replaces:
-            logger.debug("\nGNMI set:\n{0}\n{1}".format(9 * "=", str(update)))
+        def check_configs(name, configs):
+            if isinstance(name, string_types):
+                logging.debug("Handling %s as JSON string.", name)
+                try:
+                    configs = json.loads(configs)
+                except:
+                    raise Exception("{name} is invalid JSON!".format(name=name))
+                configs = [configs]
+            elif isinstance(name, dict):
+                logging.debug("Handling %s as already serialized JSON object.", name)
+                configs = [configs]
+            elif not isinstance(configs, (list, set)):
+                raise Exception(
+                    "{name} must be an iterable of configs!".format(name=name)
+                )
+            return configs
 
+        def create_updates(name, configs):
+            if not configs:
+                return None
+            configs = check_configs(name, configs)
+            updates = []
+            for config in configs:
+                if not isinstance(config, dict):
+                    raise Exception("config must be a JSON object!")
+                if len(config.keys()) > 1:
+                    raise Exception("config should only target one YANG module!")
+                top_element = next(iter(config.keys()))
+                update = proto.gnmi_pb2.Update()
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
+                config = config.pop(top_element)
+                if ietf:
+                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
+                else:
+                    update.val.json_val = json.dumps(config).encode("utf-8")
+                updates.append(update)
+            return updates
+
+        updates = create_updates("update_json_configs", update_json_configs)
+        replaces = create_updates("replace_json_configs", replace_json_configs)
         return self.set(updates=updates, replaces=replaces)
 
-    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF", origin=None):
+    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
 
         Parameters
@@ -182,16 +202,13 @@ class XEClient(Client):
         )
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = []
-            for xpath in set(xpaths):
-                gnmi_path.append(parse_xpath_to_gnmi_path(xpath, origin))
+            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [parse_xpath_to_gnmi_path(xpaths, origin)]
+            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
-        logger.debug("GNMI get:\n{0}\n{1}".format(9 * "=", str(gnmi_path)))
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def subscribe_xpaths(
@@ -201,7 +218,8 @@ class XEClient(Client):
         sub_mode="SAMPLE",
         encoding="JSON_IETF",
         sample_interval=Client._NS_IN_S * 10,
-        origin="openconfig",
+        suppress_redundant=False,
+        heartbeat_interval=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -219,86 +237,75 @@ class XEClient(Client):
             dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
             treated as simply a pre-made Subscription.
         request_mode : proto.gnmi_pb2.SubscriptionList.Mode, optional
-            Indicates whether STREAM to stream from target,
-            ONCE to stream once (like a get),
-            POLL to respond to POLL.
-            [STREAM, ONCE, POLL]
+            Indicates whether STREAM to stream from target.
+            [STREAM]
         sub_mode : proto.gnmi_pb2.SubscriptionMode, optional
             The default SubscriptionMode on a per Subscription basis in the SubscriptionList.
-            ON_CHANGE only streams updates when changes occur.
             SAMPLE will stream the subscription at a regular cadence/interval.
-            [ON_CHANGE, SAMPLE]
+            [SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
             A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
-            [JSON, JSON_IETF]
+            [JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for sample to occur.
             Defaults to 10 seconds.
+        suppress_redundant : bool, optional
+            Indicates whether values that have not changed should be sent in a SAMPLE subscription.
+        heartbeat_interval : int, optional
+            Specifies the maximum allowable silent period in nanoseconds when
+            suppress_redundant is in use. The target should send a value at least once
+            in the period specified.
 
         Returns
         -------
         subscribe()
         """
-        supported_request_modes = ["STREAM", "ONCE", "POLL"]
-        supported_encodings = ["JSON", "JSON_IETF"]
-        supported_sub_modes = ["ON_CHANGE", "SAMPLE"]
-        subscription_list = proto.gnmi_pb2.SubscriptionList()
-        subscription_list.mode = util.validate_proto_enum(
+        supported_request_modes = ["STREAM"]
+        request_mode = util.validate_proto_enum(
             "mode",
             request_mode,
             "SubscriptionList.Mode",
             proto.gnmi_pb2.SubscriptionList.Mode,
-            supported_request_modes,
+            subset=supported_request_modes,
+            return_name=True,
         )
-        subscription_list.encoding = util.validate_proto_enum(
+        supported_encodings = ["JSON_IETF"]
+        encoding = util.validate_proto_enum(
             "encoding",
             encoding,
             "Encoding",
             proto.gnmi_pb2.Encoding,
-            supported_encodings,
+            subset=supported_encodings,
+            return_name=True,
         )
-        if isinstance(xpath_subscriptions, string_types):
-            xpath_subscriptions = [xpath_subscriptions]
-        subscriptions = []
-        for xpath_subscription in xpath_subscriptions:
-            subscription = None
-            if isinstance(xpath_subscription, string_types):
-                subscription = proto.gnmi_pb2.Subscription()
-                subscription.path.CopyFrom(
-                    parse_xpath_to_gnmi_path(xpath_subscription, origin)
-                )
-                subscription.mode = util.validate_proto_enum(
-                    "sub_mode",
-                    sub_mode,
-                    "SubscriptionMode",
-                    proto.gnmi_pb2.SubscriptionMode,
-                    supported_sub_modes,
-                )
-                subscription.sample_interval = sample_interval
-            elif isinstance(xpath_subscription, dict):
-                path = parse_xpath_to_gnmi_path(xpath_subscription["path"], origin)
-                arg_dict = {
-                    "path": path,
-                    "mode": sub_mode,
-                    "sample_interval": sample_interval,
-                }
-                arg_dict.update(xpath_subscription)
-                if "mode" in arg_dict:
-                    arg_dict["mode"] = util.validate_proto_enum(
-                        "sub_mode",
-                        arg_dict["mode"],
-                        "SubscriptionMode",
-                        proto.gnmi_pb2.SubscriptionMode,
-                        supported_sub_modes,
-                    )
-                subscription = proto.gnmi_pb2.Subscription(**arg_dict)
-            elif isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
-                subscription = xpath_subscription
+        supported_sub_modes = ["SAMPLE"]
+        sub_mode = util.validate_proto_enum(
+            "sub_mode",
+            sub_mode,
+            "SubscriptionMode",
+            proto.gnmi_pb2.SubscriptionMode,
+            subset=supported_sub_modes,
+            return_name=True,
+        )
+        return super(XEClient, self).subscribe_xpaths(
+            xpath_subscriptions,
+            request_mode,
+            sub_mode,
+            encoding,
+            sample_interval,
+            suppress_redundant,
+            heartbeat_interval,
+        )
+
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+        """Naively tries to intelligently (non-sequitur!) origin
+        Otherwise assume rfc7951
+        legacy is not considered
+        """
+        if origin is None:
+            # naive but effective
+            if ":" not in xpath:
+                origin = "openconfig"
             else:
-                raise Exception("xpath in list must be xpath or dict/Path!")
-            subscriptions.append(subscription)
-        subscription_list.subscription.extend(subscriptions)
-        logger.debug(
-            "GNMI subscribe:\n{0}\n{1}".format(15 * "=", str(subscription_list))
-        )
-        return self.subscribe([subscription_list])
+                origin = "rfc7951"
+        return super(XEClient, self).parse_xpath_to_gnmi_path(xpath, origin)
