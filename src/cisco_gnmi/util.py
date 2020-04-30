@@ -37,6 +37,9 @@ except ImportError:
     from urlparse import urlparse
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 def gen_target_netloc(target, netloc_prefix="//", default_port=9339):
     """Parses and validates a supplied target URL for gRPC calls.
     Uses urllib to parse the netloc property from the URL.
@@ -51,11 +54,11 @@ def gen_target_netloc(target, netloc_prefix="//", default_port=9339):
     if not parsed_target.netloc:
         raise ValueError("Unable to parse netloc from target URL %s!" % target)
     if parsed_target.scheme:
-        logging.debug("Scheme identified in target, ignoring and using netloc.")
+        LOGGER.debug("Scheme identified in target, ignoring and using netloc.")
     target_netloc = parsed_target
     if parsed_target.port is None:
         ported_target = "%s:%i" % (parsed_target.hostname, default_port)
-        logging.debug("No target port detected, reassembled to %s.", ported_target)
+        LOGGER.debug("No target port detected, reassembled to %s.", ported_target)
         target_netloc = gen_target_netloc(ported_target)
     return target_netloc
 
@@ -120,11 +123,11 @@ def get_cn_from_cert(cert_pem):
     cert_cns = cert_parsed.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
     if len(cert_cns) > 0:
         if len(cert_cns) > 1:
-            logging.warning(
+            LOGGER.warning(
                 "Multiple CNs found for certificate, defaulting to the first one."
             )
         cert_cn = cert_cns[0].value
-        logging.debug("Using %s as certificate CN.", cert_cn)
+        LOGGER.debug("Using %s as certificate CN.", cert_cn)
     else:
-        logging.warning("No CN found for certificate.")
+        LOGGER.warning("No CN found for certificate.")
     return cert_cn

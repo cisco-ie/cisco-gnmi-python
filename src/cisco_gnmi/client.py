@@ -31,7 +31,7 @@ from . import proto
 from . import util
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class Client(object):
@@ -112,7 +112,7 @@ class Client(object):
         proto.gnmi_pb2.CapabilityResponse
         """
         message = proto.gnmi_pb2.CapabilityRequest()
-        logger.debug(message)
+        LOGGER.debug(message)
         response = self.service.Capabilities(message)
         return response
 
@@ -168,7 +168,7 @@ class Client(object):
         if extension:
             request.extension = extension
 
-        logger.debug(str(request))
+        LOGGER.debug(str(request))
 
         get_response = self.service.Get(request)
         return get_response
@@ -215,7 +215,7 @@ class Client(object):
         if extensions:
             request.extension.extend(extensions)
 
-        logger.debug(str(request))
+        LOGGER.debug(str(request))
 
         response = self.service.Set(request)
         return response
@@ -255,7 +255,7 @@ class Client(object):
             if extensions:
                 subscribe_request.extensions.extend(extensions)
 
-            logger.debug(str(subscribe_request))
+            LOGGER.debug(str(subscribe_request))
 
             return subscribe_request
 

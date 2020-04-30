@@ -30,7 +30,7 @@ from six import string_types
 from .client import Client, proto, util
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 class XEClient(Client):
@@ -111,7 +111,13 @@ class XEClient(Client):
             paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
-    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True, prefix=None):
+    def set_json(
+        self,
+        update_json_configs=None,
+        replace_json_configs=None,
+        ietf=True,
+        prefix=None,
+    ):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -136,14 +142,14 @@ class XEClient(Client):
 
         def check_configs(name, configs):
             if isinstance(configs, string_types):
-                logger.debug("Handling %s as JSON string.", name)
+                LOGGER.debug("Handling %s as JSON string.", name)
                 try:
                     configs = json.loads(configs)
                 except:
                     raise Exception("{name} is invalid JSON!".format(name=name))
                 configs = [configs]
             elif isinstance(configs, dict):
-                logger.debug("Handling %s as already serialized JSON object.", name)
+                LOGGER.debug("Handling %s as already serialized JSON object.", name)
                 configs = [configs]
             elif not isinstance(configs, (list, set)):
                 raise Exception(
