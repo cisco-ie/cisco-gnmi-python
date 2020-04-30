@@ -38,6 +38,7 @@ except ImportError:
 
 
 LOGGER = logging.getLogger(__name__)
+logger = LOGGER
 
 
 def gen_target_netloc(target, netloc_prefix="//", default_port=9339):

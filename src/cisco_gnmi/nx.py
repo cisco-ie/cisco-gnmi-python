@@ -31,6 +31,7 @@ from .client import Client, proto, util
 
 
 LOGGER = logging.getLogger(__name__)
+logger = LOGGER
 
 
 class NXClient(Client):

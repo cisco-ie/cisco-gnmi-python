@@ -32,6 +32,7 @@ from .util import gen_target_netloc, get_cert_from_target, get_cn_from_cert
 
 
 LOGGER = logging.getLogger(__name__)
+logger = LOGGER
 
 
 class ClientBuilder(object):

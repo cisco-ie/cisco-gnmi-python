@@ -32,6 +32,7 @@ from . import util
 
 
 LOGGER = logging.getLogger(__name__)
+logger = LOGGER
 
 
 class Client(object):
