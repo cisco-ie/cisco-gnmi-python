@@ -112,7 +112,7 @@ class Client(object):
         proto.gnmi_pb2.CapabilityResponse
         """
         message = proto.gnmi_pb2.CapabilityRequest()
-        LOGGER.debug(message)
+        LOGGER.debug(str(message))
         response = self.service.Capabilities(message)
         return response
 
