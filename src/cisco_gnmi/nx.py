@@ -166,3 +166,14 @@ class NXClient(Client):
             else:
                 origin = "DME"
         return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+
+    def parse_dn_to_gnmi_path(self, dn, origin="DME"):
+        """Parses a DME DN to proto.gnmi_pb2.Path."""
+        if not isinstance(dn, string_types):
+            raise Exception("dn must be a string!")
+        path = proto.gnmi_pb2.Path()
+        if origin:
+            if not isinstance(origin, string_types):
+                raise Exception("origin must be a string!")
+            path.origin = origin
+        return None
