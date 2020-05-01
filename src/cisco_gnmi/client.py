@@ -31,6 +31,10 @@ from . import proto
 from . import util
 
 
+LOGGER = logging.getLogger(__name__)
+logger = LOGGER
+
+
 class Client(object):
     """gNMI gRPC wrapper client to ease usage of gNMI.
 
@@ -109,6 +113,7 @@ class Client(object):
         proto.gnmi_pb2.CapabilityResponse
         """
         message = proto.gnmi_pb2.CapabilityRequest()
+        LOGGER.debug(str(message))
         response = self.service.Capabilities(message)
         return response
 
@@ -163,6 +168,9 @@ class Client(object):
             request.use_models = use_models
         if extension:
             request.extension = extension
+
+        LOGGER.debug(str(request))
+
         get_response = self.service.Get(request)
         return get_response
 
@@ -190,7 +198,7 @@ class Client(object):
         """
         request = proto.gnmi_pb2.SetRequest()
         if prefix:
-            request.prefix = prefix
+            request.prefix.CopyFrom(prefix)
         test_list = [updates, replaces, deletes]
         if not any(test_list):
             raise Exception("At least update, replace, or delete must be specified!")
@@ -207,6 +215,9 @@ class Client(object):
             request.delete.extend(deletes)
         if extensions:
             request.extension.extend(extensions)
+
+        LOGGER.debug(str(request))
+
         response = self.service.Set(request)
         return response
 
@@ -244,6 +255,9 @@ class Client(object):
                 )
             if extensions:
                 subscribe_request.extensions.extend(extensions)
+
+            LOGGER.debug(str(subscribe_request))
+
             return subscribe_request
 
         response_stream = self.service.Subscribe(

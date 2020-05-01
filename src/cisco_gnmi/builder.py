@@ -31,6 +31,10 @@ from .auth import CiscoAuthPlugin
 from .util import gen_target_netloc, get_cert_from_target, get_cn_from_cert
 
 
+LOGGER = logging.getLogger(__name__)
+logger = LOGGER
+
+
 class ClientBuilder(object):
     """Builder for the creation of a gNMI client.
     Supports construction of base Client and XRClient.
@@ -134,8 +138,8 @@ class ClientBuilder(object):
         if name not in self.os_class_map.keys():
             raise Exception("OS not supported!")
         else:
+            LOGGER.debug("Using %s wrapper.", name or "Client")
             self.__client_class = self.os_class_map[name]
-        logging.debug("Using %s wrapper.", name or "Client")
         return self
 
     def set_secure(
@@ -257,7 +261,7 @@ class ClientBuilder(object):
                     found_index = index
                     break
             if found_index is not None:
-                logging.warning("Found existing channel option %s, overwriting!", name)
+                LOGGER.warning("Found existing channel option %s, overwriting!", name)
                 self.__channel_options[found_index] = new_option
             else:
                 self.__channel_options.append(new_option)
@@ -279,18 +283,18 @@ class ClientBuilder(object):
             self.__root_certificates, self.__private_key, self.__certificate_chain
         )
         if self.__username and self.__password:
+            LOGGER.debug("Using username/password call authentication.")
             channel_metadata_creds = grpc.metadata_call_credentials(
                 CiscoAuthPlugin(self.__username, self.__password)
             )
-            logging.debug("Using username/password call authentication.")
         if channel_ssl_creds and channel_metadata_creds:
+            LOGGER.debug("Using SSL/metadata authentication composite credentials.")
             channel_creds = grpc.composite_channel_credentials(
                 channel_ssl_creds, channel_metadata_creds
             )
-            logging.debug("Using SSL/metadata authentication composite credentials.")
         else:
+            LOGGER.debug("Using SSL credentials, no metadata authentication.")
             channel_creds = channel_ssl_creds
-            logging.debug("Using SSL credentials, no metadata authentication.")
         if self.__ssl_target_name_override is not False:
             if self.__ssl_target_name_override is None:
                 if not self.__root_certificates:
@@ -298,7 +302,7 @@ class ClientBuilder(object):
                 self.__ssl_target_name_override = get_cn_from_cert(
                     self.__root_certificates
                 )
-                logging.warning(
+                LOGGER.warning(
                     "Overriding SSL option from certificate could increase MITM susceptibility!"
                 )
             self.set_channel_option(

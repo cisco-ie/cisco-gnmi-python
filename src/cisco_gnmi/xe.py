@@ -30,6 +30,10 @@ from six import string_types
 from .client import Client, proto, util
 
 
+LOGGER = logging.getLogger(__name__)
+logger = LOGGER
+
+
 class XEClient(Client):
     """IOS XE-specific wrapper for gNMI functionality.
     Assumes IOS XE 16.12+
@@ -108,7 +112,13 @@ class XEClient(Client):
             paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
-    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
+    def set_json(
+        self,
+        update_json_configs=None,
+        replace_json_configs=None,
+        ietf=True,
+        prefix=None,
+    ):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -132,15 +142,15 @@ class XEClient(Client):
             raise Exception("Must supply at least one set of configurations to method!")
 
         def check_configs(name, configs):
-            if isinstance(name, string_types):
-                logging.debug("Handling %s as JSON string.", name)
+            if isinstance(configs, string_types):
+                LOGGER.debug("Handling %s as JSON string.", name)
                 try:
                     configs = json.loads(configs)
                 except:
                     raise Exception("{name} is invalid JSON!".format(name=name))
                 configs = [configs]
-            elif isinstance(name, dict):
-                logging.debug("Handling %s as already serialized JSON object.", name)
+            elif isinstance(configs, dict):
+                LOGGER.debug("Handling %s as already serialized JSON object.", name)
                 configs = [configs]
             elif not isinstance(configs, (list, set)):
                 raise Exception(
@@ -171,7 +181,7 @@ class XEClient(Client):
 
         updates = create_updates("update_json_configs", update_json_configs)
         replaces = create_updates("replace_json_configs", replace_json_configs)
-        return self.set(updates=updates, replaces=replaces)
+        return self.set(prefix=prefix, updates=updates, replaces=replaces)
 
     def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.

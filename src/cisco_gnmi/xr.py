@@ -30,6 +30,10 @@ from six import string_types
 from .client import Client, proto, util
 
 
+LOGGER = logging.getLogger(__name__)
+logger = LOGGER
+
+
 class XRClient(Client):
     """IOS XR-specific wrapper for gNMI functionality.
 
@@ -130,14 +134,14 @@ class XRClient(Client):
 
         def check_configs(name, configs):
             if isinstance(name, string_types):
-                logging.debug("Handling %s as JSON string.", name)
+                LOGGER.debug("Handling %s as JSON string.", name)
                 try:
                     configs = json.loads(configs)
                 except:
                     raise Exception("{name} is invalid JSON!".format(name=name))
                 configs = [configs]
             elif isinstance(name, dict):
-                logging.debug("Handling %s as already serialized JSON object.", name)
+                LOGGER.debug("Handling %s as already serialized JSON object.", name)
                 configs = [configs]
             elif not isinstance(configs, (list, set)):
                 raise Exception(
