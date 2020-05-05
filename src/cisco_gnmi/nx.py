@@ -30,6 +30,10 @@ from six import string_types
 from .client import Client, proto, util
 
 
+LOGGER = logging.getLogger(__name__)
+logger = LOGGER
+
+
 class NXClient(Client):
     """NX-OS-specific wrapper for gNMI functionality.
 
