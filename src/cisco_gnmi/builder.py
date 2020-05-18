@@ -335,17 +335,17 @@ class ClientBuilder(object):
             channel = grpc.insecure_channel(self.__target_netloc.netloc)
         if self.__client_class is None:
             self.set_os()
-        client = (
-            self.__client_class(channel)
-            if self.__secure
-            else self.__client_class(
+        client = None
+        if self.__secure:
+            client = self.__client_class(channel)
+        else:
+            client = self.__client_class(
                 channel,
                 default_call_metadata=[
                     ("username", self.__username),
                     ("password", self.__password),
                 ],
             )
-        )
         self._reset()
         return client
 
