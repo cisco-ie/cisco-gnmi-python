@@ -29,7 +29,7 @@ from six import string_types
 
 from . import proto
 from . import util
-from . import path
+from . import path as path_helper
 
 
 class Client(object):
@@ -394,4 +394,4 @@ class Client(object):
         return self.subscribe_paths(xpath_subscriptions, *args, **kwargs)
 
     def parse_path_to_gnmi_path(self, path, origin=None):
-        return path.parse_path_to_gnmi_path(path, origin)
+        return path_helper.parse_path_to_gnmi_path(path, origin)
