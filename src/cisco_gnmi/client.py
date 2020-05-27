@@ -99,6 +99,7 @@ class Client(object):
             Timeout for gRPC functionality.
         """
         self.service = proto.gnmi_pb2_grpc.gNMIStub(grpc_channel)
+        self._channel = grpc_channel
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
