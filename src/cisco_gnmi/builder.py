@@ -267,7 +267,7 @@ class ClientBuilder(object):
                 self.__channel_options.append(new_option)
         return self
 
-    def construct(self):
+    def construct(self, return_channel=False):
         """Constructs and returns the desired Client object.
         The instance of this class will reset to default values for further building.
 
@@ -315,7 +315,10 @@ class ClientBuilder(object):
             self.set_os()
         client = self.__client_class(channel)
         self._reset()
-        return client
+        if return_channel:
+            return client, channel
+        else:
+            return client
 
     def _reset(self):
         """Resets the builder.
