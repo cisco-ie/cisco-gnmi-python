@@ -98,6 +98,7 @@ class Client(object):
         """
         self.service = proto.gnmi_pb2_grpc.gNMIStub(grpc_channel)
         self.default_call_metadata = default_call_metadata
+        self._channel = grpc_channel
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
