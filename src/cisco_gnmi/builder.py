@@ -330,7 +330,7 @@ class ClientBuilder(object):
             )
         else:
             LOGGER.warning(
-                "Insecure gRPC channel is against gNMI specification, please do not utilize."
+                "Insecure gRPC channel is against gNMI specification, personal data may be compromised."
             )
             channel = grpc.insecure_channel(self.__target_netloc.netloc)
         if self.__client_class is None:
