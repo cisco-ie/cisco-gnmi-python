@@ -293,7 +293,9 @@ def __gen_client(args):
     builder = ClientBuilder(args.netloc)
     builder.set_os(args.os)
     builder.set_call_authentication(args.username, args.password)
-    if not any([args.root_certificates, args.private_key, args.certificate_chain]):
+    if args.insecure:
+        builder._set_insecure()
+    elif not any([args.root_certificates, args.private_key, args.certificate_chain]):
         builder.set_secure_from_target()
     else:
         builder.set_secure_from_file(
@@ -339,6 +341,7 @@ def __common_args_handler(parser):
         action="store_true",
     )
     parser.add_argument("-debug", help="Print debug messages.", action="store_true")
+    parser.add_argument("-insecure", help=argparse.SUPPRESS, action="store_true")
     args = parser.parse_args(sys.argv[2:])
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
     args.username = input("Username: ")
