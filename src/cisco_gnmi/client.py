@@ -29,6 +29,7 @@ from six import string_types
 
 from . import proto
 from . import util
+from . import path as path_helper
 
 
 LOGGER = logging.getLogger(__name__)
@@ -268,9 +269,9 @@ class Client(object):
         )
         return response_stream
 
-    def subscribe_xpaths(
+    def subscribe_paths(
         self,
-        xpath_subscriptions,
+        path_subscriptions,
         request_mode="STREAM",
         sub_mode="SAMPLE",
         encoding="JSON",
@@ -279,7 +280,7 @@ class Client(object):
         heartbeat_interval=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
-        with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
+        with request as subscribe SubscriptionList. This method accepts an iterable of path (xpath-like) strings,
         dictionaries with Subscription attributes for more granularity, or already built Subscription
         objects and builds the SubscriptionList. Fields not supplied will be defaulted with the default arguments
         to the method.
@@ -288,9 +289,9 @@ class Client(object):
 
         Parameters
         ----------
-        xpath_subscriptions : str or iterable of str, dict, Subscription
+        path_subscriptions : str or iterable of str, dict, Subscription
             An iterable which is parsed to form the Subscriptions in the SubscriptionList to be passed
-            to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
+            to SubscriptionRequest. Strings are parsed as XPath-like and defaulted with the default arguments,
             dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
             treated as simply a pre-made Subscription.
         request_mode : proto.gnmi_pb2.SubscriptionList.Mode, optional
@@ -309,7 +310,8 @@ class Client(object):
             SAMPLE will stream the subscription at a regular cadence/interval.
             [TARGET_DEFINED, ON_CHANGE, SAMPLE]
         encoding : proto.gnmi_pb2.Encoding, optional
-            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data
+            A member of the proto.gnmi_pb2.Encoding enum specifying desired encoding of returned data.
+            Defaults to JSON per specification.
             [JSON, BYTES, PROTO, ASCII, JSON_IETF]
         sample_interval : int, optional
             Default nanoseconds for SAMPLE to occur.
@@ -336,18 +338,18 @@ class Client(object):
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
         if isinstance(
-            xpath_subscriptions, (string_types, dict, proto.gnmi_pb2.Subscription)
+            path_subscriptions, (string_types, dict, proto.gnmi_pb2.Subscription)
         ):
-            xpath_subscriptions = [xpath_subscriptions]
+            path_subscriptions = [path_subscriptions]
         subscriptions = []
-        for xpath_subscription in xpath_subscriptions:
+        for path_subscription in path_subscriptions:
             subscription = None
-            if isinstance(xpath_subscription, proto.gnmi_pb2.Subscription):
-                subscription = xpath_subscription
-            elif isinstance(xpath_subscription, string_types):
+            if isinstance(path_subscription, proto.gnmi_pb2.Subscription):
+                subscription = path_subscription
+            elif isinstance(path_subscription, string_types):
                 subscription = proto.gnmi_pb2.Subscription()
                 subscription.path.CopyFrom(
-                    self.parse_xpath_to_gnmi_path(xpath_subscription)
+                    self.parse_path_to_gnmi_path(path_subscription)
                 )
                 subscription.mode = util.validate_proto_enum(
                     "sub_mode",
@@ -357,22 +359,22 @@ class Client(object):
                 )
                 if sub_mode == "SAMPLE":
                     subscription.sample_interval = sample_interval
-            elif isinstance(xpath_subscription, dict):
+            elif isinstance(path_subscription, dict):
                 subscription_dict = {}
-                if "path" not in xpath_subscription.keys():
+                if "path" not in path_subscription.keys():
                     raise Exception("path must be specified in dict!")
-                if isinstance(xpath_subscription["path"], proto.gnmi_pb2.Path):
-                    subscription_dict["path"] = xpath_subscription["path"]
-                elif isinstance(xpath_subscription["path"], string_types):
-                    subscription_dict["path"] = self.parse_xpath_to_gnmi_path(
-                        xpath_subscription["path"]
+                if isinstance(path_subscription["path"], proto.gnmi_pb2.Path):
+                    subscription_dict["path"] = path_subscription["path"]
+                elif isinstance(path_subscription["path"], string_types):
+                    subscription_dict["path"] = self.parse_path_to_gnmi_path(
+                        path_subscription["path"]
                     )
                 else:
                     raise Exception("path must be string or Path proto!")
                 sub_mode_name = (
                     sub_mode
-                    if "mode" not in xpath_subscription.keys()
-                    else xpath_subscription["mode"]
+                    if "mode" not in path_subscription.keys()
+                    else path_subscription["mode"]
                 )
                 subscription_dict["mode"] = util.validate_proto_enum(
                     "sub_mode",
@@ -383,16 +385,16 @@ class Client(object):
                 if sub_mode_name == "SAMPLE":
                     subscription_dict["sample_interval"] = (
                         sample_interval
-                        if "sample_interval" not in xpath_subscription.keys()
-                        else xpath_subscription["sample_interval"]
+                        if "sample_interval" not in path_subscription.keys()
+                        else path_subscription["sample_interval"]
                     )
-                    if "suppress_redundant" in xpath_subscription.keys():
-                        subscription_dict["suppress_redundant"] = xpath_subscription[
+                    if "suppress_redundant" in path_subscription.keys():
+                        subscription_dict["suppress_redundant"] = path_subscription[
                             "suppress_redundant"
                         ]
                 if sub_mode_name != "TARGET_DEFINED":
-                    if "heartbeat_interval" in xpath_subscription.keys():
-                        subscription_dict["heartbeat_interval"] = xpath_subscription[
+                    if "heartbeat_interval" in path_subscription.keys():
+                        subscription_dict["heartbeat_interval"] = path_subscription[
                             "heartbeat_interval"
                         ]
                 subscription = proto.gnmi_pb2.Subscription(**subscription_dict)
@@ -402,86 +404,11 @@ class Client(object):
         subscription_list.subscription.extend(subscriptions)
         return self.subscribe([subscription_list])
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
-        """Parses an XPath to proto.gnmi_pb2.Path.
-        This function should be overridden by any child classes for origin logic.
-
-        Effectively wraps the std XML XPath tokenizer and traverses
-        the identified groups. Parsing robustness needs to be validated.
-        Probably best to formalize as a state machine sometime.
-        TODO: Formalize tokenizer traversal via state machine.
+    def subscribe_xpaths(self, xpath_subscriptions, *args, **kwargs):
+        """Compatibility with earlier versions.
+        Use subscribe_paths.
         """
-        if not isinstance(xpath, string_types):
-            raise Exception("xpath must be a string!")
-        path = proto.gnmi_pb2.Path()
-        if origin:
-            if not isinstance(origin, string_types):
-                raise Exception("origin must be a string!")
-            path.origin = origin
-        curr_elem = proto.gnmi_pb2.PathElem()
-        in_filter = False
-        just_filtered = False
-        curr_key = None
-        # TODO: Lazy
-        xpath = xpath.strip("/")
-        xpath_elements = xpath_tokenizer_re.findall(xpath)
-        path_elems = []
-        for index, element in enumerate(xpath_elements):
-            # stripped initial /, so this indicates a completed element
-            if element[0] == "/":
-                if not curr_elem.name:
-                    raise Exception(
-                        "Current PathElem has no name yet is trying to be pushed to path! Invalid XPath?"
-                    )
-                path_elems.append(curr_elem)
-                curr_elem = proto.gnmi_pb2.PathElem()
-                continue
-            # We are entering a filter
-            elif element[0] == "[":
-                in_filter = True
-                continue
-            # We are exiting a filter
-            elif element[0] == "]":
-                in_filter = False
-                continue
-            # If we're not in a filter then we're a PathElem name
-            elif not in_filter:
-                curr_elem.name = element[1]
-            # Skip blank spaces
-            elif not any([element[0], element[1]]):
-                continue
-            # If we're in the filter and just completed a filter expr,
-            # "and" as a junction should just be ignored.
-            elif in_filter and just_filtered and element[1] == "and":
-                just_filtered = False
-                continue
-            # Otherwise we're in a filter and this term is a key name
-            elif curr_key is None:
-                curr_key = element[1]
-                continue
-            # Otherwise we're an operator or the key value
-            elif curr_key is not None:
-                # I think = is the only possible thing to support with PathElem syntax as is
-                if element[0] in [">", "<"]:
-                    raise Exception("Only = supported as filter operand!")
-                if element[0] == "=":
-                    continue
-                else:
-                    # We have a full key here, put it in the map
-                    if curr_key in curr_elem.key.keys():
-                        raise Exception("Key already in key map!")
-                    curr_elem.key[curr_key] = element[0].strip("'\"")
-                    curr_key = None
-                    just_filtered = True
-        # Keys/filters in general should be totally cleaned up at this point.
-        if curr_key:
-            raise Exception("Hanging key filter! Incomplete XPath?")
-        # If we have a dangling element that hasn't been completed due to no
-        # / element then let's just append the final element.
-        if curr_elem:
-            path_elems.append(curr_elem)
-            curr_elem = None
-        if any([curr_elem, curr_key, in_filter]):
-            raise Exception("Unfinished elements in XPath parsing!")
-        path.elem.extend(path_elems)
-        return path
+        return self.subscribe_paths(xpath_subscriptions, *args, **kwargs)
+
+    def parse_path_to_gnmi_path(self, path, origin=None):
+        return path_helper.parse_path_to_gnmi_path(path, origin)

@@ -28,6 +28,7 @@ import logging
 
 from six import string_types
 from .client import Client, proto, util
+from .path import parse_cli_to_gnmi_path
 
 
 LOGGER = logging.getLogger(__name__)
@@ -106,7 +107,7 @@ class XRClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            paths.append(self.parse_xpath_to_gnmi_path(xpath))
+            paths.append(self.parse_path_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
     def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=True):
@@ -177,7 +178,7 @@ class XRClient(Client):
                 element = top_element_split[1]
                 config = config.pop(top_element)
                 update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(element, origin))
+                update.path.CopyFrom(self.parse_path_to_gnmi_path(element, origin))
                 if ietf:
                     update.val.json_ietf_val = json.dumps(config).encode("utf-8")
                 else:
@@ -210,9 +211,9 @@ class XRClient(Client):
         """
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
+            gnmi_path = map(self.parse_path_to_gnmi_path, set(xpaths))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
+            gnmi_path = [self.parse_path_to_gnmi_path(xpaths)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
@@ -235,18 +236,18 @@ class XRClient(Client):
         """
         gnmi_path = None
         if isinstance(commands, (list, set)):
-            gnmi_path = list(map(self.parse_cli_to_gnmi_path, commands))
+            gnmi_path = list(map(parse_cli_to_gnmi_path, commands))
         elif isinstance(commands, string_types):
-            gnmi_path = [self.parse_cli_to_gnmi_path(commands)]
+            gnmi_path = [parse_cli_to_gnmi_path(commands)]
         else:
             raise Exception(
                 "commands must be a single CLI command string or iterable of CLI commands as strings!"
             )
         return self.get(gnmi_path, encoding="ASCII")
 
-    def subscribe_xpaths(
+    def subscribe_paths(
         self,
-        xpath_subscriptions,
+        path_subscriptions,
         request_mode="STREAM",
         sub_mode="SAMPLE",
         encoding="PROTO",
@@ -264,7 +265,7 @@ class XRClient(Client):
 
         Parameters
         ----------
-        xpath_subscriptions : str or iterable of str, dict, Subscription
+        path_subscriptions : str or iterable of str, dict, Subscription
             An iterable which is parsed to form the Subscriptions in the SubscriptionList to be passed
             to SubscriptionRequest. Strings are parsed as XPaths and defaulted with the default arguments,
             dictionaries are treated as dicts of args to pass to the Subscribe init, and Subscription is
@@ -328,8 +329,8 @@ class XRClient(Client):
             subset=supported_sub_modes,
             return_name=True,
         )
-        return super(XRClient, self).subscribe_xpaths(
-            xpath_subscriptions,
+        return super(XRClient, self).subscribe_paths(
+            path_subscriptions,
             request_mode,
             sub_mode,
             encoding,
@@ -338,31 +339,17 @@ class XRClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    def parse_path_to_gnmi_path(self, path, origin=None):
         """No origin specified implies openconfig
         Otherwise origin is expected to be the module name
         """
         if origin is None:
             # naive but effective
-            if xpath.startswith("openconfig") or ":" not in xpath:
+            if path.startswith("openconfig") or ":" not in path:
                 # openconfig
                 origin = None
             else:
                 # module name
-                origin, xpath = xpath.split(":", 1)
+                origin, path = path.split(":", 1)
                 origin = origin.strip("/")
-        return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
-
-    def parse_cli_to_gnmi_path(self, command):
-        """Parses a CLI command to proto.gnmi_pb2.Path.
-        IOS XR appears to be the only OS with this functionality.
-
-        The CLI command becomes a path element.
-        """
-        if not isinstance(command, string_types):
-            raise Exception("command must be a string!")
-        path = proto.gnmi_pb2.Path()
-        curr_elem = proto.gnmi_pb2.PathElem()
-        curr_elem.name = command
-        path.elem.extend([curr_elem])
-        return path
+        return super(XRClient, self).parse_path_to_gnmi_path(path, origin)

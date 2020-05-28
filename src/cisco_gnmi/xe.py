@@ -109,7 +109,7 @@ class XEClient(Client):
                     xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
                 else:
                     xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
-            paths.append(self.parse_xpath_to_gnmi_path(xpath))
+            paths.append(self.parse_path_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
     def set_json(
@@ -170,7 +170,7 @@ class XEClient(Client):
                     raise Exception("config should only target one YANG module!")
                 top_element = next(iter(config.keys()))
                 update = proto.gnmi_pb2.Update()
-                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
+                update.path.CopyFrom(self.parse_path_to_gnmi_path(top_element))
                 config = config.pop(top_element)
                 if ietf:
                     update.val.json_ietf_val = json.dumps(config).encode("utf-8")
@@ -212,18 +212,18 @@ class XEClient(Client):
         )
         gnmi_path = None
         if isinstance(xpaths, (list, set)):
-            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
+            gnmi_path = map(self.parse_path_to_gnmi_path, set(xpaths))
         elif isinstance(xpaths, string_types):
-            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
+            gnmi_path = [self.parse_path_to_gnmi_path(xpaths)]
         else:
             raise Exception(
                 "xpaths must be a single xpath string or iterable of xpath strings!"
             )
         return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
-    def subscribe_xpaths(
+    def subscribe_paths(
         self,
-        xpath_subscriptions,
+        path_subscriptions,
         request_mode="STREAM",
         sub_mode="SAMPLE",
         encoding="JSON_IETF",
@@ -297,8 +297,8 @@ class XEClient(Client):
             subset=supported_sub_modes,
             return_name=True,
         )
-        return super(XEClient, self).subscribe_xpaths(
-            xpath_subscriptions,
+        return super(XEClient, self).subscribe_paths(
+            path_subscriptions,
             request_mode,
             sub_mode,
             encoding,
@@ -307,15 +307,15 @@ class XEClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    def parse_path_to_gnmi_path(self, path, origin=None):
         """Naively tries to intelligently (non-sequitur!) origin
         Otherwise assume rfc7951
         legacy is not considered
         """
         if origin is None:
             # naive but effective
-            if ":" not in xpath:
+            if ":" not in path:
                 origin = "openconfig"
             else:
                 origin = "rfc7951"
-        return super(XEClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(XEClient, self).parse_path_to_gnmi_path(path, origin)

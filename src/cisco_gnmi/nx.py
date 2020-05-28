@@ -63,9 +63,9 @@ class NXClient(Client):
     def set(self, *args, **kwargs):
         raise NotImplementedError("Set not yet supported on NX-OS!")
 
-    def subscribe_xpaths(
+    def subscribe_paths(
         self,
-        xpath_subscriptions,
+        path_subscriptions,
         request_mode="STREAM",
         sub_mode="SAMPLE",
         encoding="PROTO",
@@ -142,8 +142,8 @@ class NXClient(Client):
             subset=supported_sub_modes,
             return_name=True,
         )
-        return super(NXClient, self).subscribe_xpaths(
-            xpath_subscriptions,
+        return super(NXClient, self).subscribe_paths(
+            path_subscriptions,
             request_mode,
             sub_mode,
             encoding,
@@ -152,21 +152,21 @@ class NXClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    def parse_path_to_gnmi_path(self, path, origin=None):
         """Attempts to determine whether origin should be YANG (device) or DME.
         Errors on OpenConfig until support is present.
         """
-        if xpath.startswith("openconfig"):
+        if path.startswith("openconfig"):
             raise NotImplementedError(
                 "OpenConfig data models not yet supported on NX-OS!"
             )
         if origin is None:
             if any(
-                map(xpath.startswith, ["Cisco-NX-OS-device", "/Cisco-NX-OS-device"])
+                map(path.startswith, ["Cisco-NX-OS-device", "/Cisco-NX-OS-device"])
             ):
                 origin = "device"
                 # Remove the module
-                xpath = xpath.split(":", 1)[1]
+                path = path.split(":", 1)[1]
             else:
                 origin = "DME"
-        return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(NXClient, self).parse_path_to_gnmi_path(path, origin)
