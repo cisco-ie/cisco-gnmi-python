@@ -1,4 +1,5 @@
 import json
+import logging
 from . import proto
 
 def parse_path_to_xpath(path):
@@ -10,42 +11,66 @@ def parse_path_to_xpath(path):
             xpath += "[{}={}]".format(key, elem.key[key])
     return origin, xpath
 
-def flatten(message):
+def flatten(message, convert_strings=True, ignore_delete=True):
     flatten_method_map = {
-        proto.gnmi_pb2.GetResponse: _flatten_get_response
+        proto.gnmi_pb2.GetResponse: _flatten_get_response,
+        proto.gnmi_pb2.SubscribeResponse: _flatten_subscribe_response
     }
     identified = False
     flattened_message = None
     for message_class, flatten_method in flatten_method_map.items():
         if isinstance(message, message_class):
             identified = True
-            flattened_message = flatten_method(message)
+            flattened_message = flatten_method(message, convert_strings, ignore_delete)
     if not identified:
         raise Exception("Flatten not yet supported for message class!")
     return flattened_message
 
-def _flatten_get_response(get_response):
+def _flatten_get_response(get_response, convert_strings=True, ignore_delete=True):
     flattened_response = {}
     for notification in get_response.notification:
-        _, xpath_prefix = parse_path_to_xpath(notification.prefix)
-        for update in notification.update:
-            _, xpath_update = parse_path_to_xpath(update.path)
-            xpath = ""
-            if xpath_prefix and xpath_update:
-                xpath = "{}/{}".format(xpath_prefix, xpath_update)
-            elif xpath_prefix:
-                xpath = xpath_prefix
-            elif xpath_update:
-                xpath = xpath_update
-            update_name = update.WhichOneOf("value")
-            update_value = getattr(update, update_name)
-            if update_name in {"json_val", "json_ietf_val"}:
-                raw_json = getattr(update, update_name)
-                serialized_json = json.load(raw_json)
-                sub_flattened_response = flatten_yang_json(xpath, serialized_json)
-                flattened_response.update(sub_flattened_response)
-            else:
-                flattened_response[xpath] = update_value
+        flattened_response.update(__flatten_notification(notification))
+    return flattened_response
+
+def _flatten_subscribe_response(subscribe_response, convert_strings=True, ignore_delete=True):
+    return __flatten_notification(subscribe_response.update)
+
+def __flatten_notification(notification_message, convert_strings=True, ignore_delete=True):
+    flattened_response = {}
+    _, xpath_prefix = parse_path_to_xpath(notification_message.prefix)
+    def __realize_xpath(_prefix, _suffix):
+        _xpath = ""
+        if _prefix and _suffix:
+            _xpath = "{}/{}".format(_prefix, _suffix)
+        elif _prefix:
+            _xpath = _prefix
+        elif _suffix:
+            _xpath = _suffix
+        return _xpath
+    for update in notification_message.update:
+        _, xpath_update = parse_path_to_xpath(update.path)
+        xpath = __realize_xpath(xpath_prefix, xpath_update)
+        value_name = update.val.WhichOneof("value")
+        update_value = getattr(update.val, value_name)
+        if value_name in {"json_val", "json_ietf_val"}:
+            serialized_json = None
+            try:
+                json_content = update_value.decode("utf-8")
+                serialized_json = json.loads(json_content)
+            except json.decoder.JSONDecodeError as e:
+                logging.error(json_content)
+                raise e
+            sub_flattened_response = flatten_yang_json(xpath, serialized_json, convert_strings)
+            flattened_response.update(sub_flattened_response)
+        else:
+            flattened_response[xpath] = update_value
+    if not ignore_delete:
+        for path in notification_message.delete:
+            _, xpath_delete = parse_path_to_xpath(path)
+            xpath = __realize_xpath(xpath_prefix, xpath_delete)
+            if xpath in flattened_response.keys():
+                raise Exception("Deleted element in update messages!")
+            flattened_response[xpath] = None
     return flattened_response
 
 def flatten_yang_json(prefix, yang_json, convert_strings=True):
