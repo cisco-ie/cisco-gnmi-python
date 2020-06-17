@@ -29,5 +29,6 @@ from .xr import XRClient
 from .nx import NXClient
 from .xe import XEClient
 from .builder import ClientBuilder
+from . import flatten
 
-__version__ = "1.0.10"
+__version__ = "1.0.11"
