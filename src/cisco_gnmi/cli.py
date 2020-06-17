@@ -34,7 +34,7 @@ import logging
 import argparse
 from getpass import getpass
 from google.protobuf import json_format, text_format
-from . import ClientBuilder, proto, __version__
+from . import ClientBuilder, proto, __version__, flatten
 from google.protobuf.internal import enum_type_wrapper
 import sys
 
@@ -146,6 +146,11 @@ def gnmi_subscribe():
         type=str,
         choices=proto.gnmi_pb2.Encoding.keys(),
     )
+    parser.add_argument(
+        "-flatten",
+        help="Flatten the SubscribeResponse output.",
+        action="store_true"
+    )
     args = __common_args_handler(parser)
     # Set default XPath outside of argparse due to default being persistent in argparse.
     if not args.xpath:
@@ -181,7 +186,7 @@ def gnmi_subscribe():
                 synced = True
             if not synced and args.sync_start:
                 continue
-            formatted_message = __format_message(subscribe_response)
+            formatted_message = __format_message(subscribe_response, args.dump_json, args.flatten)
             if args.dump_file == "stdout":
                 logging.info(formatted_message)
             else:
@@ -219,6 +224,11 @@ def gnmi_get():
         help="Dump as JSON instead of textual protos.",
         action="store_true",
     )
+    parser.add_argument(
+        "-flatten",
+        help="Flatten the SubscribeResponse output.",
+        action="store_true"
+    )
     args = __common_args_handler(parser)
     # Set default XPath outside of argparse due to default being persistent in argparse.
     if not args.xpath:
@@ -230,7 +240,7 @@ def gnmi_get():
     if args.data_type:
         kwargs["data_type"] = args.data_type
     get_response = client.get_xpaths(args.xpath, **kwargs)
-    logging.info(__format_message(get_response))
+    logging.info(__format_message(get_response, args.dump_json, args.flatten))
 
 
 def gnmi_set():
@@ -308,9 +318,11 @@ def __gen_client(args):
     return builder.construct()
 
 
-def __format_message(message, as_json=False):
+def __format_message(message, as_json=False, as_flat=False):
     formatted_message = None
-    if as_json:
+    if as_flat:
+        formatted_message = json.dumps(flatten.flatten(message), sort_keys=True, indent=4)
+    elif as_json:
         formatted_message = json_format.MessageToJson(message, sort_keys=True)
     else:
         formatted_message = text_format.MessageToString(message)
