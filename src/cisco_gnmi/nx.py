@@ -152,7 +152,8 @@ class NXClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    @classmethod
+    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
         """Attempts to determine whether origin should be YANG (device) or DME.
         Errors on OpenConfig until support is present.
         """
@@ -169,4 +170,4 @@ class NXClient(Client):
                 xpath = xpath.split(":", 1)[1]
             else:
                 origin = "DME"
-        return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(NXClient, cls).parse_xpath_to_gnmi_path(xpath, origin)
