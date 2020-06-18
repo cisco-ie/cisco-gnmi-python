@@ -78,6 +78,9 @@ def flatten_yang_json(prefix, yang_json, convert_strings=True):
                             keys[key] = value
                 else:
                     keys[key] = value
+            # Fun fact, boolean is a sub of int in Python
+            elif isinstance(value, bool):
+                keys[key] = json.dumps(value)
             elif isinstance(value, (int, float)):
                 values[key] = value
             elif isinstance(value, (dict, list)):
