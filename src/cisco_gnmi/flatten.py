@@ -29,7 +29,7 @@ import logging
 from . import proto
 
 
-def flatten(message, convert_strings=True, ignore_delete=True):
+def flatten(message, convert_strings=True, ignore_delete=True, origin_as_module=False):
     """Top level convenience function which accepts a protobuf
     message and indirects to the appropriate handler function to
     flatten the data to a simple, flat xpath:value dict representation.
@@ -44,7 +44,9 @@ def flatten(message, convert_strings=True, ignore_delete=True):
     for message_class, flatten_method in flatten_method_map.items():
         if isinstance(message, message_class):
             identified = True
-            flattened_message = flatten_method(message, convert_strings, ignore_delete)
+            flattened_message = flatten_method(
+                message, convert_strings, ignore_delete, origin_as_module
+            )
     if not identified:
         raise Exception("Flatten not yet supported for message class!")
     return flattened_message
@@ -109,29 +111,46 @@ def parse_path_to_xpath(path):
     return origin, xpath
 
 
-def _flatten_get_response(get_response, convert_strings=True, ignore_delete=True):
+def _flatten_get_response(
+    get_response, convert_strings=True, ignore_delete=True, origin_as_module=False
+):
     flattened_response = {}
     for notification in get_response.notification:
-        flattened_response.update(__flatten_notification(notification))
+        flattened_response.update(
+            __flatten_notification(
+                notification, convert_strings, ignore_delete, origin_as_module
+            )
+        )
     return flattened_response
 
 
 def _flatten_subscribe_response(
-    subscribe_response, convert_strings=True, ignore_delete=True
+    subscribe_response, convert_strings=True, ignore_delete=True, origin_as_module=False
 ):
-    return __flatten_notification(subscribe_response.update)
+    return __flatten_notification(
+        subscribe_response.update, convert_strings, ignore_delete, origin_as_module
+    )
 
 
 def __flatten_notification(
-    notification_message, convert_strings=True, ignore_delete=True
+    notification_message,
+    convert_strings=True,
+    ignore_delete=True,
+    origin_as_module=False,
 ):
     flattened_response = {}
-    _, xpath_prefix = parse_path_to_xpath(notification_message.prefix)
+    origin, xpath_prefix = parse_path_to_xpath(notification_message.prefix)
+    # This is to accomodate IOS XR/NX-OS reporting module as origin
+    if origin_as_module is True and origin:
+        xpath_prefix = "/{}:{}".format(origin, xpath_prefix.strip("/"))
 
     def __realize_xpath(_prefix, _suffix):
         _xpath = ""
         if _prefix and _suffix:
-            _xpath = "{}/{}".format(_prefix, _suffix)
+            template_str = (
+                "{}{}" if _prefix.endswith("/") or _suffix.startswith("/") else "{}/{}"
+            )
+            _xpath = template_str.format(_prefix, _suffix)
         elif _prefix:
             _xpath = _prefix
         elif _suffix:
@@ -139,7 +158,12 @@ def __flatten_notification(
         return _xpath
 
     for update in notification_message.update:
-        _, xpath_update = parse_path_to_xpath(update.path)
+        _origin, xpath_update = parse_path_to_xpath(update.path)
+        # TODO: Janky logic
+        if origin and _origin:
+            raise Exception("Double origin? {} and {}.".format(origin, _origin))
+        elif not origin and origin_as_module is True:
+            xpath_update = "/{}:{}".format(_origin, xpath_update.strip("/"))
         xpath = __realize_xpath(xpath_prefix, xpath_update)
         value_name = update.val.WhichOneof("value")
         update_value = getattr(update.val, value_name)
@@ -159,7 +183,12 @@ def __flatten_notification(
             flattened_response[xpath] = update_value
     if not ignore_delete:
         for path in notification_message.delete:
-            _, xpath_delete = parse_path_to_xpath(path)
+            _origin, xpath_delete = parse_path_to_xpath(path)
+            # TODO: Janky logic
+            if origin and _origin:
+                raise Exception("Double origin? {} and {}.".format(origin, _origin))
+            elif not origin and origin_as_module is True:
+                xpath_delete = "/{}:{}".format(_origin, xpath_delete.strip("/"))
             xpath = __realize_xpath(xpath_prefix, xpath_delete)
             if xpath in flattened_response.keys():
                 raise Exception("Deleted element in update messages!")

@@ -89,7 +89,7 @@ def gnmi_capabilities():
     args = __common_args_handler(parser)
     client = __gen_client(args)
     capability_response = client.capabilities()
-    logging.info(__format_message(capability_response))
+    logging.info(__format_message(capability_response, args.os))
 
 
 def gnmi_subscribe():
@@ -172,7 +172,7 @@ def gnmi_subscribe():
             args.dump_file,
             "JSON" if args.dump_json else "textual proto",
         )
-        logging.debug("Subscribing to:\n%s", "\n".join(args.xpath))
+        logging.debug("Subscribing to [ %s ].", " | ".join(args.xpath))
         synced = False
         for subscribe_response in client.subscribe_xpaths(args.xpath, **kwargs):
             logging.debug("SubscribeResponse received.")
@@ -182,10 +182,11 @@ def gnmi_subscribe():
                     logging.warning("Stopping on sync_response.")
                     break
                 synced = True
+                continue
             if not synced and args.sync_start:
                 continue
             formatted_message = __format_message(
-                subscribe_response, args.dump_json, args.flatten
+                subscribe_response, args.os, args.dump_json, args.flatten
             )
             if args.dump_file == "stdout":
                 logging.info(formatted_message)
@@ -238,7 +239,7 @@ def gnmi_get():
     if args.data_type:
         kwargs["data_type"] = args.data_type
     get_response = client.get_xpaths(args.xpath, **kwargs)
-    logging.info(__format_message(get_response, args.dump_json, args.flatten))
+    logging.info(__format_message(get_response, args.os, args.dump_json, args.flatten))
 
 
 def gnmi_set():
@@ -286,11 +287,11 @@ def gnmi_set():
             kwargs["ietf"] = False
         client = __gen_client(args)
         set_response = client.set_json(**kwargs)
-        logging.info(__format_message(set_response))
+        logging.info(__format_message(set_response, args.os))
     if args.delete_xpath:
         if getattr(client, "delete_xpaths", None) is not None:
             delete_response = client.delete_xpaths(args.xpath)
-            logging.info(__format_message(delete_response))
+            logging.info(__format_message(delete_response, args.os))
         else:
             raise Exception(
                 "Convenience delete_xpaths is not supported in the client library!"
@@ -316,11 +317,13 @@ def __gen_client(args):
     return builder.construct()
 
 
-def __format_message(message, as_json=False, as_flat=False):
+def __format_message(message, os_name, as_json=False, as_flat=False):
     formatted_message = None
     if as_flat:
         formatted_message = json.dumps(
-            flatten.flatten(message), sort_keys=True, indent=4
+            flatten.flatten(message, origin_as_module=bool("xr" in os_name.lower())),
+            sort_keys=True,
+            indent=4,
         )
     elif as_json:
         formatted_message = json_format.MessageToJson(message, sort_keys=True)
