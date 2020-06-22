@@ -52,7 +52,7 @@ def flatten(message, convert_strings=True, ignore_delete=True, origin_as_module=
     return flattened_message
 
 
-def flatten_yang_json(prefix, yang_json, convert_strings=True):
+def flatten_yang_json(prefix, yang_json, convert_strings=True, implicit_keys=True):
     """Flattens a JSON structure with special consideration
     around strings - inlining like keys and attempting integer
     conversion given the uint64-as-string JSON encoding rules.
@@ -68,6 +68,7 @@ def flatten_yang_json(prefix, yang_json, convert_strings=True):
     elif isinstance(yang_json, dict):
         for key, value in yang_json.items():
             if isinstance(value, str):
+                potential_key = False
                 if convert_strings:
                     try:
                         values[key] = int(value)
@@ -75,11 +76,15 @@ def flatten_yang_json(prefix, yang_json, convert_strings=True):
                         try:
                             values[key] = float(value)
                         except ValueError:
-                            keys[key] = value
+                            potential_key = True
                 else:
+                    potential_key = True
+                if potential_key and implicit_keys:
                     keys[key] = value
+                else:
+                    values[key] = value
             # Fun fact, boolean is a sub of int in Python
-            elif isinstance(value, bool):
+            elif isinstance(value, bool) and implicit_keys:
                 keys[key] = json.dumps(value)
             elif isinstance(value, (int, float)):
                 values[key] = value
