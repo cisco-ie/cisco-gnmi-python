@@ -83,7 +83,7 @@ class Client(object):
     # gNMI uses nanoseconds, baseline to seconds
     _NS_IN_S = int(1e9)
 
-    def __init__(self, grpc_channel, timeout=_C_MAX_LONG):
+    def __init__(self, grpc_channel, timeout=_C_MAX_LONG, default_call_metadata=None):
         """gNMI initialization wrapper which simply wraps some aspects of the gNMI stub.
 
         Parameters
@@ -91,14 +91,14 @@ class Client(object):
         grpc_channel : grpc.Channel
             The gRPC channel to initialize the gNMI stub with.
             Use ClientBuilder if unfamiliar with gRPC.
-        username : str
-            Username to authenticate gNMI RPCs.
-        password : str
-            Password to authenticate gNMI RPCs.
         timeout : uint
             Timeout for gRPC functionality.
+        default_call_metadata : list
+            Metadata to be sent with each gRPC call.
         """
         self.service = proto.gnmi_pb2_grpc.gNMIStub(grpc_channel)
+        self.default_call_metadata = default_call_metadata
+        self._channel = grpc_channel
 
     def capabilities(self):
         """Capabilities allows the client to retrieve the set of capabilities that
@@ -114,7 +114,9 @@ class Client(object):
         """
         message = proto.gnmi_pb2.CapabilityRequest()
         LOGGER.debug(str(message))
-        response = self.service.Capabilities(message)
+        response = self.service.Capabilities(
+            message, metadata=self.default_call_metadata
+        )
         return response
 
     def get(
@@ -171,7 +173,7 @@ class Client(object):
 
         LOGGER.debug(str(request))
 
-        get_response = self.service.Get(request)
+        get_response = self.service.Get(request, metadata=self.default_call_metadata)
         return get_response
 
     def set(
@@ -217,7 +219,8 @@ class Client(object):
             request.extension.extend(extensions)
 
         LOGGER.debug(str(request))
-        response = self.service.Set(request)
+
+        response = self.service.Set(request, metadata=self.default_call_metadata)
         return response
 
     def subscribe(self, request_iter, extensions=None):
@@ -260,7 +263,8 @@ class Client(object):
             return subscribe_request
 
         response_stream = self.service.Subscribe(
-            (validate_request(request) for request in request_iter)
+            (validate_request(request) for request in request_iter),
+            metadata=self.default_call_metadata,
         )
         return response_stream
 

@@ -158,9 +158,23 @@ class ClientBuilder(object):
         -------
         self
         """
+        self.__secure = True
         self.__root_certificates = root_certificates
         self.__private_key = private_key
         self.__certificate_chain = certificate_chain
+        return self
+
+    def _set_insecure(self):
+        """Sets the flag to use an insecure channel.
+        THIS IS AGAINST SPECIFICATION and should not
+        be used unless necessary and secure transport
+        is already well understood. 
+
+        Returns
+        -------
+        self
+        """
+        self.__secure = False
         return self
 
     def set_secure_from_file(
@@ -267,7 +281,7 @@ class ClientBuilder(object):
                 self.__channel_options.append(new_option)
         return self
 
-    def construct(self):
+    def construct(self, return_channel=False):
         """Constructs and returns the desired Client object.
         The instance of this class will reset to default values for further building.
 
@@ -276,28 +290,28 @@ class ClientBuilder(object):
         Client or NXClient or XEClient or XRClient
         """
         channel = None
-        channel_ssl_creds = None
-        channel_metadata_creds = None
-        channel_creds = None
-        channel_ssl_creds = None
-        if any((self.__root_certificates, self.__private_key, self.__certificate_chain)):
+        if self.__secure:
+            LOGGER.debug("Using secure channel.")
+            channel_metadata_creds = None
+            if self.__username and self.__password:
+                LOGGER.debug("Using username/password call authentication.")
+                channel_metadata_creds = grpc.metadata_call_credentials(
+                    CiscoAuthPlugin(self.__username, self.__password)
+                )
             channel_ssl_creds = grpc.ssl_channel_credentials(
                 self.__root_certificates, self.__private_key, self.__certificate_chain
             )
-        if self.__username and self.__password:
-            channel_metadata_creds = grpc.metadata_call_credentials(
-                CiscoAuthPlugin(self.__username, self.__password)
-            )
-            logging.debug("Using username/password call authentication.")
-        if channel_ssl_creds and channel_metadata_creds:
-            channel_creds = grpc.composite_channel_credentials(
-                channel_ssl_creds, channel_metadata_creds
-            )
-            logging.debug("Using SSL/metadata authentication composite credentials.")
-        elif channel_ssl_creds:
-            channel_creds = channel_ssl_creds
-            logging.debug("Using SSL credentials, no metadata authentication.")
-        if channel_creds:
+            channel_creds = None
+            if channel_ssl_creds and channel_metadata_creds:
+                LOGGER.debug("Using SSL/metadata authentication composite credentials.")
+                channel_creds = grpc.composite_channel_credentials(
+                    channel_ssl_creds, channel_metadata_creds
+                )
+            else:
+                LOGGER.debug(
+                    "Using SSL credentials, no channel metadata authentication."
+                )
+                channel_creds = channel_ssl_creds
             if self.__ssl_target_name_override is not False:
                 if self.__ssl_target_name_override is None:
                     if not self.__root_certificates:
@@ -305,7 +319,7 @@ class ClientBuilder(object):
                     self.__ssl_target_name_override = get_cn_from_cert(
                         self.__root_certificates
                     )
-                    logging.warning(
+                    LOGGER.warning(
                         "Overriding SSL option from certificate could increase MITM susceptibility!"
                     )
                 self.set_channel_option(
@@ -315,62 +329,28 @@ class ClientBuilder(object):
                 self.__target_netloc.netloc, channel_creds, self.__channel_options
             )
         else:
+            LOGGER.warning(
+                "Insecure gRPC channel is against gNMI specification, personal data may be compromised."
+            )
             channel = grpc.insecure_channel(self.__target_netloc.netloc)
         if self.__client_class is None:
             self.set_os()
-        client = self.__client_class(channel)
-        self._reset()
-        return client
-
-    def save_construct(self):
-        """Constructs and returns the desired Client object.
-        The instance of this class will reset to default values for further building.
-
-        Returns
-        -------
-        Client or NXClient or XEClient or XRClient
-        """
-        channel = None
-        channel_ssl_creds = None
-        channel_metadata_creds = None
-        channel_creds = None
-        channel_ssl_creds = grpc.ssl_channel_credentials(
-            self.__root_certificates, self.__private_key, self.__certificate_chain
-        )
-        if self.__username and self.__password:
-            LOGGER.debug("Using username/password call authentication.")
-            channel_metadata_creds = grpc.metadata_call_credentials(
-                CiscoAuthPlugin(self.__username, self.__password)
-            )
-        if channel_ssl_creds and channel_metadata_creds:
-            LOGGER.debug("Using SSL/metadata authentication composite credentials.")
-            channel_creds = grpc.composite_channel_credentials(
-                channel_ssl_creds, channel_metadata_creds
-            )
+        client = None
+        if self.__secure:
+            client = self.__client_class(channel)
         else:
-            LOGGER.debug("Using SSL credentials, no metadata authentication.")
-            channel_creds = channel_ssl_creds
-        if self.__ssl_target_name_override is not False:
-            if self.__ssl_target_name_override is None:
-                if not self.__root_certificates:
-                    raise Exception("Deriving override requires root certificate!")
-                self.__ssl_target_name_override = get_cn_from_cert(
-                    self.__root_certificates
-                )
-                LOGGER.warning(
-                    "Overriding SSL option from certificate could increase MITM susceptibility!"
-                )
-            self.set_channel_option(
-                "grpc.ssl_target_name_override", self.__ssl_target_name_override
+            client = self.__client_class(
+                channel,
+                default_call_metadata=[
+                    ("username", self.__username),
+                    ("password", self.__password),
+                ],
             )
-        channel = grpc.secure_channel(
-            self.__target_netloc.netloc, channel_creds, self.__channel_options
-        )
-        if self.__client_class is None:
-            self.set_os()
-        client = self.__client_class(channel)
         self._reset()
-        return client
+        if return_channel:
+            return client, channel
+        else:
+            return client
 
     def _reset(self):
         """Resets the builder.
@@ -388,4 +368,5 @@ class ClientBuilder(object):
         self.__password = None
         self.__channel_options = None
         self.__ssl_target_name_override = False
+        self.__secure = True
         return self
