@@ -23,7 +23,7 @@ the License.
 
 """Wrapper for NX-OS to simplify usage of gNMI implementation."""
 
-
+import json
 import logging
 
 from six import string_types
@@ -159,7 +159,7 @@ class NXClient(Client):
         replaces = create_updates("replace_json_configs", replace_json_configs)
         return self.set(prefix=prefix, updates=updates, replaces=replaces)
 
-    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON_IETF"):
+    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON"):
         """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
 
         Parameters
@@ -178,7 +178,7 @@ class NXClient(Client):
         -------
         get()
         """
-        supported_encodings = ["JSON", "JSON_IETF"]
+        supported_encodings = ["JSON"]
         encoding = util.validate_proto_enum(
             "encoding",
             encoding,
@@ -288,19 +288,18 @@ class NXClient(Client):
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """Attempts to determine whether origin should be YANG (device) or DME.
-        Errors on OpenConfig until support is present.
         """
-        if xpath.startswith("openconfig"):
-            raise NotImplementedError(
-                "OpenConfig data models not yet supported on NX-OS!"
-            )
         if origin is None:
             if any(
-                map(xpath.startswith, ["Cisco-NX-OS-device", "/Cisco-NX-OS-device"])
+                map(xpath.startswith, [
+                    "Cisco-NX-OS-device",
+                    "/Cisco-NX-OS-device",
+                    "cisco-nx-os-device",
+                    "/Cisco-nx-os-device"])
             ):
                 origin = "device"
                 # Remove the module
                 xpath = xpath.split(":", 1)[1]
             else:
-                origin = "DME"
+                origin = "openconfig"
         return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)

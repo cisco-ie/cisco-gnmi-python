@@ -279,6 +279,61 @@ class ClientBuilder(object):
         channel_ssl_creds = None
         channel_metadata_creds = None
         channel_creds = None
+        channel_ssl_creds = None
+        if any((self.__root_certificates, self.__private_key, self.__certificate_chain)):
+            channel_ssl_creds = grpc.ssl_channel_credentials(
+                self.__root_certificates, self.__private_key, self.__certificate_chain
+            )
+        if self.__username and self.__password:
+            channel_metadata_creds = grpc.metadata_call_credentials(
+                CiscoAuthPlugin(self.__username, self.__password)
+            )
+            logging.debug("Using username/password call authentication.")
+        if channel_ssl_creds and channel_metadata_creds:
+            channel_creds = grpc.composite_channel_credentials(
+                channel_ssl_creds, channel_metadata_creds
+            )
+            logging.debug("Using SSL/metadata authentication composite credentials.")
+        elif channel_ssl_creds:
+            channel_creds = channel_ssl_creds
+            logging.debug("Using SSL credentials, no metadata authentication.")
+        if channel_creds:
+            if self.__ssl_target_name_override is not False:
+                if self.__ssl_target_name_override is None:
+                    if not self.__root_certificates:
+                        raise Exception("Deriving override requires root certificate!")
+                    self.__ssl_target_name_override = get_cn_from_cert(
+                        self.__root_certificates
+                    )
+                    logging.warning(
+                        "Overriding SSL option from certificate could increase MITM susceptibility!"
+                    )
+                self.set_channel_option(
+                    "grpc.ssl_target_name_override", self.__ssl_target_name_override
+                )
+            channel = grpc.secure_channel(
+                self.__target_netloc.netloc, channel_creds, self.__channel_options
+            )
+        else:
+            channel = grpc.insecure_channel(self.__target_netloc.netloc)
+        if self.__client_class is None:
+            self.set_os()
+        client = self.__client_class(channel)
+        self._reset()
+        return client
+
+    def save_construct(self):
+        """Constructs and returns the desired Client object.
+        The instance of this class will reset to default values for further building.
+
+        Returns
+        -------
+        Client or NXClient or XEClient or XRClient
+        """
+        channel = None
+        channel_ssl_creds = None
+        channel_metadata_creds = None
+        channel_creds = None
         channel_ssl_creds = grpc.ssl_channel_credentials(
             self.__root_certificates, self.__private_key, self.__certificate_chain
         )

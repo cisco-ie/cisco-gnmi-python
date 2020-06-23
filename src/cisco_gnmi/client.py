@@ -217,7 +217,6 @@ class Client(object):
             request.extension.extend(extensions)
 
         LOGGER.debug(str(request))
-
         response = self.service.Set(request)
         return response
 
