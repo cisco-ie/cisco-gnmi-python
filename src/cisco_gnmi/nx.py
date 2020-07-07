@@ -105,6 +105,9 @@ class NXClient(Client):
             JSON configs to apply as replacements.
         ietf : bool, optional
             Use JSON_IETF vs JSON.
+        prefix : proto.gnmi_pb2.Path, optional
+            A common path prepended to all path elements in the message. This reduces message size by
+            removing redundent path elements. Smaller message == improved thoughput.
 
         Returns
         -------
@@ -172,7 +175,7 @@ class NXClient(Client):
             [ALL, CONFIG, STATE, OPERATIONAL]
         encoding : proto.gnmi_pb2.GetRequest.Encoding, optional
             A direct value or key from the Encoding enum
-            [JSON, JSON_IETF]
+            [JSON] is only setting supported at this time
 
         Returns
         -------

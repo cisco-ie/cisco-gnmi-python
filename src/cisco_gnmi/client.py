@@ -321,6 +321,9 @@ class Client(object):
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
             in the period specified. Also applies in ON_CHANGE.
+        prefix : proto.gnmi_pb2.Path, optional
+            A common path prepended to all path elements in the message. This reduces message size by
+            removing redundent path elements. Smaller message == improved thoughput.
 
         Returns
         -------
