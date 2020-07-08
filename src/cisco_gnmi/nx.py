@@ -298,7 +298,7 @@ class NXClient(Client):
                     "Cisco-NX-OS-device",
                     "/Cisco-NX-OS-device",
                     "cisco-nx-os-device",
-                    "/Cisco-nx-os-device"])
+                    "/cisco-nx-os-device"])
             ):
                 origin = "device"
                 # Remove the module
