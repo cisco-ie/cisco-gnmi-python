@@ -23,7 +23,7 @@ the License.
 
 """Wrapper for NX-OS to simplify usage of gNMI implementation."""
 
-
+import json
 import logging
 
 from six import string_types
@@ -56,12 +56,149 @@ class NXClient(Client):
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     """
+    def delete_xpaths(self, xpaths, prefix=None):
+        """A convenience wrapper for set() which constructs Paths from supplied xpaths
+        to be passed to set() as the delete parameter.
 
-    def get(self, *args, **kwargs):
-        raise NotImplementedError("Get not yet supported on NX-OS!")
+        Parameters
+        ----------
+        xpaths : iterable of str
+            XPaths to specify to be deleted.
+            If prefix is specified these strings are assumed to be the suffixes.
+        prefix : str
+            The XPath prefix to apply to all XPaths for deletion.
 
-    def set(self, *args, **kwargs):
-        raise NotImplementedError("Set not yet supported on NX-OS!")
+        Returns
+        -------
+        set()
+        """
+        if isinstance(xpaths, string_types):
+            xpaths = [xpaths]
+        paths = []
+        # prefix is not supported on NX yet
+        prefix = None
+        for xpath in xpaths:
+            if prefix:
+                if prefix.endswith("/") and xpath.startswith("/"):
+                    xpath = "{prefix}{xpath}".format(
+                        prefix=prefix[:-1], xpath=xpath[1:]
+                    )
+                elif prefix.endswith("/") or xpath.startswith("/"):
+                    xpath = "{prefix}{xpath}".format(prefix=prefix, xpath=xpath)
+                else:
+                    xpath = "{prefix}/{xpath}".format(prefix=prefix, xpath=xpath)
+            paths.append(self.parse_xpath_to_gnmi_path(xpath))
+        return self.set(deletes=paths)
+
+    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=False, prefix=None):
+        """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
+        All parameters are optional, but at least one must be present.
+
+        This method expects JSON in the same format as what you might send via the native gRPC interface
+        with a fully modeled configuration which is then parsed to meet the gNMI implementation.
+
+        Parameters
+        ----------
+        update_json_configs : iterable of JSON configurations, optional
+            JSON configs to apply as updates.
+        replace_json_configs : iterable of JSON configurations, optional
+            JSON configs to apply as replacements.
+        ietf : bool, optional
+            Use JSON_IETF vs JSON.
+        prefix : proto.gnmi_pb2.Path, optional
+            A common path prepended to all path elements in the message. This reduces message size by
+            removing redundent path elements. Smaller message == improved thoughput.
+
+        Returns
+        -------
+        set()
+        """
+        # JSON_IETF and prefix are not supported on NX yet
+        ietf = False
+        prefix = None
+
+        if not any([update_json_configs, replace_json_configs]):
+            raise Exception("Must supply at least one set of configurations to method!")
+
+        def check_configs(name, configs):
+            if isinstance(configs, string_types):
+                logger.debug("Handling %s as JSON string.", name)
+                try:
+                    configs = json.loads(configs)
+                except:
+                    raise Exception("{name} is invalid JSON!".format(name=name))
+                configs = [configs]
+            elif isinstance(configs, dict):
+                logger.debug("Handling %s as already serialized JSON object.", name)
+                configs = [configs]
+            elif not isinstance(configs, (list, set)):
+                raise Exception(
+                    "{name} must be an iterable of configs!".format(name=name)
+                )
+            return configs
+
+        def create_updates(name, configs):
+            if not configs:
+                return None
+            configs = check_configs(name, configs)
+            updates = []
+            for config in configs:
+                if not isinstance(config, dict):
+                    raise Exception("config must be a JSON object!")
+                if len(config.keys()) > 1:
+                    raise Exception("config should only target one YANG module!")
+                top_element = next(iter(config.keys()))
+                update = proto.gnmi_pb2.Update()
+                update.path.CopyFrom(self.parse_xpath_to_gnmi_path(top_element))
+                config = config.pop(top_element)
+                if ietf:
+                    update.val.json_ietf_val = json.dumps(config).encode("utf-8")
+                else:
+                    update.val.json_val = json.dumps(config).encode("utf-8")
+                updates.append(update)
+            return updates
+
+        updates = create_updates("update_json_configs", update_json_configs)
+        replaces = create_updates("replace_json_configs", replace_json_configs)
+        return self.set(prefix=prefix, updates=updates, replaces=replaces)
+
+    def get_xpaths(self, xpaths, data_type="ALL", encoding="JSON"):
+        """A convenience wrapper for get() which forms proto.gnmi_pb2.Path from supplied xpaths.
+
+        Parameters
+        ----------
+        xpaths : iterable of str or str
+            An iterable of XPath strings to request data of
+            If simply a str, wraps as a list for convenience
+        data_type : proto.gnmi_pb2.GetRequest.DataType, optional
+            A direct value or key from the GetRequest.DataType enum
+            [ALL, CONFIG, STATE, OPERATIONAL]
+        encoding : proto.gnmi_pb2.GetRequest.Encoding, optional
+            A direct value or key from the Encoding enum
+            [JSON] is only setting supported at this time
+
+        Returns
+        -------
+        get()
+        """
+        supported_encodings = ["JSON"]
+        encoding = util.validate_proto_enum(
+            "encoding",
+            encoding,
+            "Encoding",
+            proto.gnmi_pb2.Encoding,
+            supported_encodings,
+        )
+        gnmi_path = None
+        if isinstance(xpaths, (list, set)):
+            gnmi_path = map(self.parse_xpath_to_gnmi_path, set(xpaths))
+        elif isinstance(xpaths, string_types):
+            gnmi_path = [self.parse_xpath_to_gnmi_path(xpaths)]
+        else:
+            raise Exception(
+                "xpaths must be a single xpath string or iterable of xpath strings!"
+            )
+        return self.get(gnmi_path, data_type=data_type, encoding=encoding)
 
     def subscribe_xpaths(
         self,
@@ -154,19 +291,18 @@ class NXClient(Client):
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """Attempts to determine whether origin should be YANG (device) or DME.
-        Errors on OpenConfig until support is present.
         """
-        if xpath.startswith("openconfig"):
-            raise NotImplementedError(
-                "OpenConfig data models not yet supported on NX-OS!"
-            )
         if origin is None:
             if any(
-                map(xpath.startswith, ["Cisco-NX-OS-device", "/Cisco-NX-OS-device"])
+                map(xpath.startswith, [
+                    "Cisco-NX-OS-device",
+                    "/Cisco-NX-OS-device",
+                    "cisco-nx-os-device",
+                    "/cisco-nx-os-device"])
             ):
                 origin = "device"
                 # Remove the module
                 xpath = xpath.split(":", 1)[1]
             else:
-                origin = "DME"
+                origin = "openconfig"
         return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)

@@ -230,6 +230,7 @@ class XEClient(Client):
         sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
+        prefix=None
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -265,6 +266,9 @@ class XEClient(Client):
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
             in the period specified.
+        prefix : proto.gnmi_pb2.Path, optional
+            A common path prepended to all path elements in the message. This reduces message size by
+            removing redundent path elements. Smaller message == improved thoughput.
 
         Returns
         -------
@@ -305,6 +309,7 @@ class XEClient(Client):
             sample_interval,
             suppress_redundant,
             heartbeat_interval,
+            prefix
         )
 
     def parse_xpath_to_gnmi_path(self, xpath, origin=None):
