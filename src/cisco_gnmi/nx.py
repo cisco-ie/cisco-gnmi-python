@@ -56,6 +56,7 @@ class NXClient(Client):
     >>> capabilities = client.capabilities()
     >>> print(capabilities)
     """
+
     def delete_xpaths(self, xpaths, prefix=None):
         """A convenience wrapper for set() which constructs Paths from supplied xpaths
         to be passed to set() as the delete parameter.
@@ -90,7 +91,13 @@ class NXClient(Client):
             paths.append(self.parse_xpath_to_gnmi_path(xpath))
         return self.set(deletes=paths)
 
-    def set_json(self, update_json_configs=None, replace_json_configs=None, ietf=False, prefix=None):
+    def set_json(
+        self,
+        update_json_configs=None,
+        replace_json_configs=None,
+        ietf=False,
+        prefix=None,
+    ):
         """A convenience wrapper for set() which assumes JSON payloads and constructs desired messages.
         All parameters are optional, but at least one must be present.
 
@@ -289,20 +296,25 @@ class NXClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    @classmethod
+    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
         """Attempts to determine whether origin should be YANG (device) or DME.
         """
         if origin is None:
             if any(
-                map(xpath.startswith, [
-                    "Cisco-NX-OS-device",
-                    "/Cisco-NX-OS-device",
-                    "cisco-nx-os-device",
-                    "/cisco-nx-os-device"])
+                map(
+                    xpath.startswith,
+                    [
+                        "Cisco-NX-OS-device",
+                        "/Cisco-NX-OS-device",
+                        "cisco-nx-os-device",
+                        "/cisco-nx-os-device",
+                    ],
+                )
             ):
                 origin = "device"
                 # Remove the module
                 xpath = xpath.split(":", 1)[1]
             else:
                 origin = "openconfig"
-        return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(NXClient, cls).parse_xpath_to_gnmi_path(xpath, origin)

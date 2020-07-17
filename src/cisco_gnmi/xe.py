@@ -230,7 +230,7 @@ class XEClient(Client):
         sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
-        prefix=None
+        prefix=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -309,10 +309,11 @@ class XEClient(Client):
             sample_interval,
             suppress_redundant,
             heartbeat_interval,
-            prefix
+            prefix,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    @classmethod
+    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
         """Naively tries to intelligently (non-sequitur!) origin
         Otherwise assume rfc7951
         legacy is not considered
@@ -323,4 +324,4 @@ class XEClient(Client):
                 origin = "openconfig"
             else:
                 origin = "rfc7951"
-        return super(XEClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(XEClient, cls).parse_xpath_to_gnmi_path(xpath, origin)
