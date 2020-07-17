@@ -230,7 +230,7 @@ class XEClient(Client):
         sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
-        prefix=None
+        prefix=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -309,7 +309,7 @@ class XEClient(Client):
             sample_interval,
             suppress_redundant,
             heartbeat_interval,
-            prefix
+            prefix,
         )
 
     @classmethod
