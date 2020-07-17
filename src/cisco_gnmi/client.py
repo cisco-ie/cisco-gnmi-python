@@ -408,8 +408,7 @@ class Client(object):
         subscription_list.subscription.extend(subscriptions)
         return self.subscribe([subscription_list])
 
-    @classmethod
-    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """Parses an XPath to proto.gnmi_pb2.Path.
         This function should be overridden by any child classes for origin logic.
 
