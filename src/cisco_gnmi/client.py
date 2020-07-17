@@ -277,6 +277,7 @@ class Client(object):
         sample_interval=_NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
+        prefix=None
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -320,6 +321,9 @@ class Client(object):
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
             in the period specified. Also applies in ON_CHANGE.
+        prefix : proto.gnmi_pb2.Path, optional
+            A common path prepended to all path elements in the message. This reduces message size by
+            removing redundent path elements. Smaller message == improved thoughput.
 
         Returns
         -------
@@ -335,6 +339,8 @@ class Client(object):
         subscription_list.encoding = util.validate_proto_enum(
             "encoding", encoding, "Encoding", proto.gnmi_pb2.Encoding
         )
+        if prefix:
+            subscription_list.prefix.CopyFrom(prefix)
         if isinstance(
             xpath_subscriptions, (string_types, dict, proto.gnmi_pb2.Subscription)
         ):
