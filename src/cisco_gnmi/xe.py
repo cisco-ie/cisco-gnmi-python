@@ -312,8 +312,7 @@ class XEClient(Client):
             prefix
         )
 
-    @classmethod
-    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
+    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
         """Naively tries to intelligently (non-sequitur!) origin
         Otherwise assume rfc7951
         legacy is not considered
@@ -324,4 +323,4 @@ class XEClient(Client):
                 origin = "openconfig"
             else:
                 origin = "rfc7951"
-        return super(XEClient, cls).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(XEClient, self).parse_xpath_to_gnmi_path(xpath, origin)
