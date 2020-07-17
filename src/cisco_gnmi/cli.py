@@ -114,6 +114,12 @@ def gnmi_subscribe():
         choices=proto.gnmi_pb2.SubscriptionMode.keys(),
     )
     parser.add_argument(
+        "-req_mode",
+        help="SubscriptionList.Mode mode for Subscriptions. Defaults to STREAM.",
+        default="STREAM",
+        choices=proto.gnmi_pb2.SubscriptionList.Mode.keys(),
+    )
+    parser.add_argument(
         "-suppress_redundant",
         help="Suppress redundant information in Subscription.",
         action="store_true",
@@ -159,6 +165,8 @@ def gnmi_subscribe():
         kwargs["sample_interval"] = args.interval * int(1e9)
     if args.mode:
         kwargs["sub_mode"] = args.mode
+    if args.req_mode:
+        kwargs["request_mode"] = args.req_mode
     if args.suppress_redundant:
         kwargs["suppress_redundant"] = args.suppress_redundant
     if args.heartbeat_interval:

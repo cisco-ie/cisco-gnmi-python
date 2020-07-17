@@ -289,7 +289,8 @@ class NXClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    @classmethod
+    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
         """Attempts to determine whether origin should be YANG (device) or DME.
         """
         if origin is None:

@@ -338,7 +338,8 @@ class XRClient(Client):
             heartbeat_interval,
         )
 
-    def parse_xpath_to_gnmi_path(self, xpath, origin=None):
+    @classmethod
+    def parse_xpath_to_gnmi_path(cls, xpath, origin=None):
         """No origin specified implies openconfig
         Otherwise origin is expected to be the module name
         """
@@ -351,9 +352,10 @@ class XRClient(Client):
                 # module name
                 origin, xpath = xpath.split(":", 1)
                 origin = origin.strip("/")
-        return super(XRClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(XRClient, cls).parse_xpath_to_gnmi_path(xpath, origin)
 
-    def parse_cli_to_gnmi_path(self, command):
+    @classmethod
+    def parse_cli_to_gnmi_path(cls, command):
         """Parses a CLI command to proto.gnmi_pb2.Path.
         IOS XR appears to be the only OS with this functionality.
 
