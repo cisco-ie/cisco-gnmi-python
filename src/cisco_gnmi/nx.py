@@ -306,4 +306,4 @@ class NXClient(Client):
                 xpath = xpath.split(":", 1)[1]
             else:
                 origin = "openconfig"
-        return super(NXClient, self).parse_xpath_to_gnmi_path(xpath, origin)
+        return super(NXClient, cls).parse_xpath_to_gnmi_path(xpath, origin)
