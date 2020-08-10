@@ -4,7 +4,7 @@
 
 This library wraps gNMI functionality to ease usage with Cisco implementations in Python programs. Derived from [openconfig/gnmi](https://github.com/openconfig/gnmi/tree/master/proto).
 
-**This is not an officially supported Cisco product.** This library is intended to serve as a reference implementation and streamline gNMI client development with Cisco products.
+**This is not an officially supported Cisco product.** This library is intended to serve as a gNMI client reference implementation and streamline development with Cisco products.
 
 - [cisco-gnmi-python](#cisco-gnmi-python)
   - [Usage](#usage)
