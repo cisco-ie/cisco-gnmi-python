@@ -212,7 +212,7 @@ class Client(object):
         if updates:
             request.update.extend(updates)
         if replaces:
-            request.replaces.extend(replaces)
+            request.replace.extend(replaces)
         if deletes:
             request.delete.extend(deletes)
         if extensions:
