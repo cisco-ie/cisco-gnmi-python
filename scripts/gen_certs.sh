@@ -3,14 +3,16 @@
 
 CERT_BASE="certs"
 
-if [ -z $1 ] || [ -z $2 ]; then
-    echo "Usage: gen_certs.sh <server_hostname> <ip> [<password>]"
+if [ -z $4 ]; then
+    echo "Usage: gen_certs.sh <server_hostname> <server_ip> <client_hostname> <client_ip> [<password>]"
     exit 1
 fi
 
 server_hostname=$1
-ip=$2
-password=$3
+server_ip=$2
+client_hostname=$3
+client_ip=$4
+password=$5
 
 mkdir -p $CERT_BASE
 
@@ -28,10 +30,10 @@ else
 fi
 
 # Setting up device cert and key
-print_red "GENERATING device certificates with CN $server_hostname and IP $ip"
+print_red "GENERATING device certificates with CN $server_hostname and IP $server_ip"
 openssl genrsa -out $CERT_BASE/device.key 2048
 openssl req -subj /C=/ST=/L=/O=/CN=$server_hostname -new -key $CERT_BASE/device.key -out $CERT_BASE/device.csr
-openssl x509 -req -in $CERT_BASE/device.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/device.crt -days 1095 -sha256 -extfile <(printf "%s" "subjectAltName=DNS:$server_hostname,IP:$ip")
+openssl x509 -req -in $CERT_BASE/device.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/device.crt -days 1095 -sha256 -extfile <(printf "%s" "subjectAltName=DNS:$server_hostname,IP:$server_ip")
 
 # Encrypt device key
 if [ ! -z $password ]; then
@@ -45,13 +47,7 @@ else
     print_red "SKIPPING device key encryption"
 fi
 
-# Setting up client cert and key
-if [ -f "$CERT_BASE/client.key" ] && [ -f "$CERT_BASE/client.crt" ]; then
-    print_red "SKIPPING client certificates generation, already exist"
-else
-    hostname=$(hostname)
-    print_red "GENERATING client certificates with CN $hostname"
-    openssl genrsa -out $CERT_BASE/client.key 2048
-    openssl req -subj /C=/ST=/L=/O=/CN=$hostname -new -key $CERT_BASE/client.key -out $CERT_BASE/client.csr
-    openssl x509 -req -in $CERT_BASE/client.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/client.crt -days 1095 -sha256
-fi
+print_red "GENERATING client certificates with CN $client_hostname and IP $client_ip"
+openssl genrsa -out $CERT_BASE/client.key 2048
+openssl req -subj /C=/ST=/L=/O=/CN=$client_hostname -new -key $CERT_BASE/client.key -out $CERT_BASE/client.csr
+openssl x509 -req -in $CERT_BASE/client.csr -CA $CERT_BASE/rootCA.pem -CAkey $CERT_BASE/rootCA.key -CAcreateserial -out $CERT_BASE/client.crt -days 1095 -sha256 -extfile <(printf "%s" "subjectAltName=DNS:$client_hostname,IP:$client_ip")
