@@ -253,6 +253,7 @@ class XRClient(Client):
         sample_interval=Client._NS_IN_S * 10,
         suppress_redundant=False,
         heartbeat_interval=None,
+        prefix=None,
     ):
         """A convenience wrapper of subscribe() which aids in building of SubscriptionRequest
         with request as subscribe SubscriptionList. This method accepts an iterable of simply xpath strings,
@@ -296,6 +297,8 @@ class XRClient(Client):
             Specifies the maximum allowable silent period in nanoseconds when
             suppress_redundant is in use. The target should send a value at least once
             in the period specified.
+        prefix: proto.Path, optional
+            Prefix path that can be used as a general path to prepend to all Path elements. (might not be supported on XR)
 
         Returns
         -------
@@ -336,6 +339,7 @@ class XRClient(Client):
             sample_interval,
             suppress_redundant,
             heartbeat_interval,
+            prefix,
         )
 
     @classmethod
