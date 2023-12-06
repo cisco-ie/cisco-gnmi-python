@@ -22,7 +22,9 @@ the License.
 """
 
 """This library wraps gNMI functionality to ease usage in Python programs."""
-
+import os
+# Workaround for out-of-date proto files
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 
 from .client import Client
 from .xr import XRClient
